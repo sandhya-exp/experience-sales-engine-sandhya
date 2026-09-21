@@ -6,15 +6,19 @@ import { UserMenu } from "@/components/shell/user-menu";
 import type { SessionUser } from "@/lib/auth";
 import { NewLeadDialog } from "@/components/dashboard/new-lead-dialog";
 import { NotificationBell } from "@/components/shell/notification-bell";
+import { RecentActivityMenu } from "@/components/shell/recent-activity-menu";
+import { listRecentActivities } from "@/lib/repo/activities";
 import { getNotificationState } from "@/lib/notifications";
 
 /**
- * Slim bar above the content: global search, New Lead, profile. On large
- * screens the brand lives in the sidebar; below that the sidebar is hidden
- * and the brand mark shows here instead.
+ * Slim bar above the content: global search, then the header actions —
+ * Recent Activity, New Lead, notifications, profile. Recent Activity ("what
+ * happened") and the bell ("what needs my attention") are deliberately
+ * separate controls. On large screens the brand lives in the sidebar; below
+ * that the sidebar is hidden and the brand mark shows here instead.
  */
 export async function TopBar({ user, initialQuery }: { user: SessionUser; initialQuery?: string }) {
-  const notifications = await getNotificationState();
+  const [notifications, recentActivity] = await Promise.all([getNotificationState(), listRecentActivities(12)]);
   return (
     <header className="sticky top-0 z-30 flex h-14 items-center gap-4 border-b border-border bg-card/90 px-6 backdrop-blur">
       <Link href="/" className="flex items-center gap-3 lg:hidden">
@@ -32,7 +36,8 @@ export async function TopBar({ user, initialQuery }: { user: SessionUser; initia
         />
       </form>
 
-      <div className="ml-auto flex items-center gap-3">
+      <div className="ml-auto flex items-center gap-2 sm:gap-3">
+        <RecentActivityMenu initial={recentActivity.map((a) => ({ id: a.id, lead_id: a.lead_id, company_name: a.company_name, type: a.type, body: a.body, actor_name: a.actor_name, occurred_at: a.occurred_at }))} />
         <NewLeadDialog>
           <Button size="sm" className="h-9 px-3.5 text-[13px]">
             <Plus className="h-4 w-4" /> New Lead

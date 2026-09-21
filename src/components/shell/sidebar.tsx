@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useState } from "react";
-import { AlertTriangle, Activity, KanbanSquare, Inbox, CalendarDays, Building2, Home, Users, PackageCheck, ListChecks, CalendarClock } from "lucide-react";
+import { AlertTriangle, KanbanSquare, Inbox, CalendarDays, Building2, Home, Users, PackageCheck, ListChecks, CalendarClock } from "lucide-react";
 import { DOWNSTREAM } from "@/lib/modules";
 import type { TeamMember } from "@/lib/repo/users";
 import { ExperienceLogo } from "@/components/brand/logo";
@@ -125,7 +125,8 @@ export function Sidebar({
           </ul>
         </div>
 
-        {/* Follow-through — what has to happen next, and when. */}
+        {/* Follow-through — what has to happen next, and when. Recent activity
+            ("what happened") is a header action instead, next to New Lead. */}
         <div>
           <p className="section-label px-3 pb-2">Follow-through</p>
           <ul className="space-y-0.5">
@@ -134,9 +135,6 @@ export function Sidebar({
             </NavItem>
             <NavItem href="/schedule" active={onSchedule} icon={CalendarClock} badge={meetingCount > 0 ? meetingCount : undefined}>
               Schedule
-            </NavItem>
-            <NavItem href="/activity" active={onActivity} icon={Activity}>
-              Recent activity
             </NavItem>
             <NavItem href={downstreamHref} active={onDownstream} icon={PackageCheck}>
               {DOWNSTREAM.navLabel}

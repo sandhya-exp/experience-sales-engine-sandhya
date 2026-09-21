@@ -19,7 +19,7 @@ Prerequisites: Node 20+, and PostgreSQL running locally (Postgres.app or `brew i
 npm install
 cp .env.example .env.local        # edit DATABASE_URL if your Postgres isn't postgres:postgres@localhost:5432
 createdb sales_engine             # once
-npm run db:setup                  # applies db/schema.sql, then seeds demo data
+npm run db:setup                  # applies db/schema.sql (reading DATABASE_URL from .env.local), then seeds demo data
 npm run dev                       # http://localhost:3000
 ```
 

@@ -8,7 +8,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "db:schema": "psql \"${DATABASE_URL:-postgres://postgres:postgres@localhost:5432/sales_engine}\" -f db/schema.sql",
+    "db:schema": "node scripts/db-schema.mjs",
     "db:seed": "tsx db/seed.ts",
     "db:setup": "npm run db:schema && npm run db:seed",
     "eval:ai": "tsx evals/ai-intelligence/run.ts"

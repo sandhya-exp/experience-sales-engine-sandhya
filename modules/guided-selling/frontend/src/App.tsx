@@ -735,18 +735,10 @@ function App() {
         <header className="mb-6 flex flex-wrap items-start justify-between gap-4">
           <div>{!embed && <p className="text-xs font-medium uppercase tracking-[.12em] text-muted-foreground">Platform · React · TypeScript</p>}<h1 className={cn('font-bold tracking-tight', embed ? 'text-2xl' : 'mt-1 text-3xl')}>{title}</h1></div>
           <div className="flex flex-wrap items-center gap-2">
-            {embed && (
-              <div className="w-64">
-                <AccountCombobox
-                  accounts={state.customers}
-                  selectedId={c.id}
-                  onSelect={(id) => act('/api/account/select', { customer_id: id }, 'customer')}
-                  light
-                />
-              </div>
-            )}
-            <Badge>{view === 'home' ? `Admin · ${state.customers.length} accounts` : view === 'handoff' ? `Inbox · ${queued} queued` : c.name}</Badge>
-            <Badge variant="warning">{view === 'home' ? `${queued} handoffs waiting` : view === 'handoff' ? 'CRM → Customer 360' : c.contract.quote_amount}</Badge>
+            {/* Embedded: the host workspace picks the account (its own won and
+                quoted deals) and passes it in the URL, so no picker here. */}
+            <Badge>{view === 'handoff' ? `Inbox · ${queued} queued` : c.name}</Badge>
+            <Badge variant="warning">{view === 'handoff' ? `${queued} queued` : c.contract.quote_amount}</Badge>
           </div>
         </header>
 

@@ -42,10 +42,19 @@ export interface QuoteModuleStatus {
  */
 export const MODULE_MOUNT = "/quote-module";
 
-/** The same-origin URL that embeds the module for one opportunity. */
-export function moduleEmbedPath(accountKey: string, leadId: string, opts: { embed?: boolean } = {}): string {
-  const p = new URLSearchParams({ lead_id: leadId, customer_id: accountKey });
-  if (opts.embed !== false) p.set("embed", "1");
+/**
+ * The same-origin URL that embeds the module, for one opportunity or bare.
+ *
+ * `embed=1` is always on: it tells the module the host already provides the
+ * shell, so it drops its own brand block, account picker and left rail and lays
+ * its steps out horizontally. Embedding without it was what put a second full
+ * application chrome inside the panel.
+ */
+export function moduleEmbedPath(accountKey?: string, leadId?: string): string {
+  const p = new URLSearchParams();
+  if (leadId) p.set("lead_id", leadId);
+  if (accountKey) p.set("customer_id", accountKey);
+  p.set("embed", "1");
   return `${MODULE_MOUNT}?${p.toString()}`;
 }
 

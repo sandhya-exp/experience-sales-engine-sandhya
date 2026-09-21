@@ -1,23 +1,24 @@
 import Link from "next/link";
-import { ArrowRight, ExternalLink } from "lucide-react";
+import { ExternalLink } from "lucide-react";
 import { listLeadRows } from "@/lib/repo/leads";
-import { listContactsForCompany } from "@/lib/repo/contacts";
 import { headers } from "next/headers";
 import { getCurrentUser } from "@/lib/auth";
 import { getQuoteWorkspaceConfig, accountKeyFor, buildHandoffPayload, deliverHandoff } from "@/lib/handoff";
-import { computeReadiness } from "@/lib/readiness";
 import { DOWNSTREAM } from "@/lib/modules";
-import { formatActivityTime } from "@/lib/format";
-import { Button } from "@/components/ui/button";
-import { cn } from "@/lib/utils";
-import { quoteModuleStatus, moduleEmbedPath, MODULE_MOUNT } from "@/lib/quote-module";
+import { quoteModuleStatus, moduleEmbedPath } from "@/lib/quote-module";
 import { QuoteModulePanel } from "@/components/workspace/quote-module-panel";
+import { OpportunitySwitcher } from "@/components/workspace/opportunity-switcher";
 
 /**
- * Quote Ready — the handoff boundary. Left: opportunities already in Quote Ready
- * and qualified opportunities ready to continue. Right: the Quote Ready module
- * (modules/guided-selling) embedded for the selected opportunity — handoff → Customer 360
- * → quote/contract → signing → documents → renewal.
+ * Ready to Contract — the handoff boundary, and the contract module itself.
+ *
+ * The page is the module, full width. There used to be a column of
+ * opportunities beside it, which meant three panels of navigation on one screen
+ * (this app's sidebar, that list, and the module's own) for a step where the
+ * opportunity has already been chosen. Choosing happens where the work is — on
+ * the opportunity, with Continue to Contract — so all that is left here is a
+ * compact switcher in the header for moving between the deals already across
+ * the line.
  */
 export default async function GuidedSellingPage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
   const sp = await searchParams;
@@ -25,25 +26,18 @@ export default async function GuidedSellingPage({ searchParams }: { searchParams
   const rows = await listLeadRows();
   const cfg = getQuoteWorkspaceConfig();
 
+  // The accounts offered here are this workspace's own deals that have crossed
+  // the boundary — quoted or won. The module never sources its own account list.
   const inModule = rows.filter((r) => r.status === "quoted" || r.status === "won");
-  const qualified = rows.filter((r) => r.status === "qualified");
-  const ready: typeof qualified = [];
-  for (const r of qualified) {
-    const contacts = await listContactsForCompany(r.company_id);
-    if (computeReadiness(r, contacts).complete) ready.push(r);
-  }
-  // Same-origin path: the module is proxied through this app (next.config.ts),
-  // so the browser only ever talks to one server and this URL is correct both
-  // locally and deployed.
+
   const urlFor = (r: (typeof rows)[number]) =>
     moduleEmbedPath(
       accountKeyFor({ id: r.company_id, name: r.company_name, domain: r.company_domain, industry: r.company_industry, created_at: r.created_at }),
       r.id
     );
 
-  const current = inModule.find((r) => r.id === selected) ?? null;
-  // One shared probe (retries once, real timeout) — a module that is merely
-  // still starting must not be reported as stopped.
+  // Default to the most recent deal so the page is never an empty module.
+  const current = inModule.find((r) => r.id === selected) ?? inModule[0] ?? null;
   const moduleStatus = await quoteModuleStatus();
   const moduleUp = moduleStatus.state === "ok";
   // The module keeps its inbox in memory: if it was restarted (or was down when
@@ -56,80 +50,49 @@ export default async function GuidedSellingPage({ searchParams }: { searchParams
     const payload = await buildHandoffPayload(current.id, user?.name ?? "System", origin);
     if (payload) await deliverHandoff(payload);
   }
-  const embedSrc = cfg.baseUrl ? (current ? urlFor(current) : MODULE_MOUNT) : null;
+  // Always embedded: `embed=1` is what tells the module the host already
+  // provides the shell, so it drops its own brand block, account picker and
+  // left rail and lays its steps out horizontally.
+  const embedSrc = cfg.baseUrl ? (current ? urlFor(current) : moduleEmbedPath()) : null;
 
   return (
-    <div className="flex h-[calc(100vh-3.5rem)] min-h-0">
-      <aside className="flex w-[22rem] shrink-0 flex-col overflow-y-auto border-r border-border bg-card px-5 pb-8 pt-6">
-        <h1 className="text-xl font-bold leading-tight tracking-tight text-foreground">{DOWNSTREAM.name}</h1>
-        <p className="mt-0.5 text-[13px] text-muted-foreground">Opportunities in {DOWNSTREAM.name}, and qualified opportunities ready to continue.</p>
-
-        <Section title={`In ${DOWNSTREAM.name}`} count={inModule.length} empty={`No opportunities in ${DOWNSTREAM.name} yet.`}>
-          {inModule.map((r) => {
-            const active = r.id === current?.id;
-            return (
-              <li key={r.id}>
-                <Link
-                  href={`${DOWNSTREAM.route}?lead=${r.id}`}
-                  className={cn("flex items-center justify-between gap-3 rounded-lg px-3 py-2.5 transition-colors hover:bg-muted", active && "bg-accent hover:bg-accent")}
-                >
-                  <div className="min-w-0">
-                    <p className="truncate text-sm font-semibold text-foreground">{r.company_name}</p>
-                    <p className="truncate text-xs text-muted-foreground">
-                      {r.status === "won" ? "Won" : DOWNSTREAM.name}
-                      {r.quote_requested_at ? ` · ${formatActivityTime(r.quote_requested_at)}` : ""}
-                      {r.owner_name ? ` · ${r.owner_name}` : ""}
-                    </p>
-                  </div>
-                  <ArrowRight className={cn("h-4 w-4 shrink-0", active ? "text-primary" : "text-muted-foreground/50")} />
-                </Link>
-              </li>
-            );
-          })}
-        </Section>
-
-        <Section title="Ready to continue" count={ready.length} empty="No qualified opportunities are ready to continue.">
-          {ready.map((r) => (
-            <li key={r.id} className="flex items-center justify-between gap-3 px-3 py-2.5">
-              <div className="min-w-0">
-                <Link href={`/leads/${r.id}`} className="block truncate text-sm font-semibold text-foreground hover:text-primary">
-                  {r.company_name}
-                </Link>
-                <p className="truncate text-xs text-muted-foreground">
-                  Qualified{r.number_of_users ? ` · ${r.number_of_users} users` : ""}
-                  {r.owner_name ? ` · ${r.owner_name}` : ""}
-                </p>
-              </div>
-              <Button asChild size="sm">
-                <Link href={`/leads/${r.id}/quote`}>Continue <ArrowRight className="h-4 w-4" /></Link>
-              </Button>
-            </li>
-          ))}
-        </Section>
-      </aside>
-
-      <section className="flex min-w-0 flex-1 flex-col bg-background">
-        <div className="flex h-12 shrink-0 items-center justify-between gap-4 border-b border-border bg-card px-5">
-          <div className="flex min-w-0 items-center gap-2 text-sm">
-            <span className="font-semibold text-foreground">{DOWNSTREAM.partner}</span>
-            {current && (
-              <>
-                <span className="text-muted-foreground">/</span>
-                <Link href={`/leads/${current.id}`} className="truncate text-muted-foreground hover:text-foreground">
-                  {current.company_name}
-                </Link>
-              </>
-            )}
-          </div>
-          {embedSrc && (
-            <a href={embedSrc.replace(/([?&])embed=1&?/, "$1").replace(/[?&]$/, "")} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-[13px] font-medium text-primary hover:underline">
-              Open in new tab <ExternalLink className="h-3.5 w-3.5" />
-            </a>
+    <div className="flex h-[calc(100vh-3.5rem)] min-h-0 flex-col bg-background">
+      <div className="flex h-12 shrink-0 flex-wrap items-center justify-between gap-3 border-b border-border bg-card px-5">
+        <div className="flex min-w-0 items-center gap-2.5 text-sm">
+          <span className="shrink-0 font-semibold text-foreground">{DOWNSTREAM.name}</span>
+          {current && (
+            <>
+              <span className="text-muted-foreground">/</span>
+              <OpportunitySwitcher
+                current={current.id}
+                options={inModule.map((r) => ({
+                  id: r.id,
+                  label: r.company_name,
+                  // Only "Won" is worth the space — everything in this list is
+                  // already at this stage, so repeating the stage name truncates
+                  // the company name for nothing.
+                  hint: r.status === "won" ? "Won" : null,
+                }))}
+              />
+              <Link href={`/leads/${current.id}`} className="hidden shrink-0 text-[13px] text-muted-foreground hover:text-foreground sm:inline">
+                Open opportunity
+              </Link>
+            </>
           )}
         </div>
+        {embedSrc && (
+          <a
+            href={embedSrc.replace(/([?&])embed=1&?/, "$1").replace(/[?&]$/, "")}
+            target="_blank"
+            rel="noreferrer"
+            className="inline-flex shrink-0 items-center gap-1 text-[13px] font-medium text-primary hover:underline"
+          >
+            Open in new tab <ExternalLink className="h-3.5 w-3.5" />
+          </a>
+        )}
+      </div>
 
-        <QuoteModulePanel key={embedSrc ?? "none"} status={moduleStatus} embedSrc={embedSrc} />
-      </section>
+      <QuoteModulePanel key={embedSrc ?? "none"} status={moduleStatus} embedSrc={embedSrc} />
     </div>
   );
 }
@@ -142,16 +105,3 @@ async function moduleKnows(baseUrl: string, leadId: string): Promise<boolean> {
     return true; // unreachable: don't attempt a push
   }
 }
-
-function Section({ title, count, empty, children }: { title: string; count: number; empty: string; children: React.ReactNode }) {
-  return (
-    <section className="mt-6">
-      <div className="mb-1.5 flex items-center justify-between px-3">
-        <p className="section-label">{title}</p>
-        <span className="text-xs tabular-nums text-muted-foreground">{count}</span>
-      </div>
-      {count === 0 ? <p className="px-3 py-2 text-[13px] text-muted-foreground">{empty}</p> : <ul className="space-y-0.5">{children}</ul>}
-    </section>
-  );
-}
-

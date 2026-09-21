@@ -1,6 +1,6 @@
 # Experience Sales Engine — Lead & Deal Workspace · Quick start
 
-Next.js (React + TypeScript) · Tailwind + shadcn/ui · Postgres. The Guided Selling module
+Next.js (React + TypeScript) · Tailwind + shadcn/ui · Postgres. The contract module
 (Quote → Approval → Contract → E-signature → Renewal) is included in `modules/guided-selling`
 and starts with the same command. Open everything from **one link: http://localhost:3000**.
 
@@ -42,19 +42,26 @@ Wait for `[workspace] ▲ Next.js … http://localhost:3000`, then open **http:/
 | Step | Where |
 |---|---|
 | Customer submits an inquiry (and can book a discovery call) | http://localhost:3000/inquire |
-| Sales signs in — `sandhya@experience.com` / `demo1234` (also `priya@` / `marcus@experience.com`) | http://localhost:3000/login |
+| Sign in — `sandhya@experience.com` / `demo1234` (Admin: full lifecycle) or `sadhana@experience.com` / `demo1234` (Sales User: stops at Scheduled Tasks) | http://localhost:3000/login |
 | New inquiry appears at the top of the Sales Pipeline and in the 🔔 | Sales Pipeline |
 | Open it: Contacts · Activity · Qualification · **AI Intelligence** (chain, evidence, gaps, readiness, "AI process & evidence") | Lead workspace |
 | Best AI example: **Meridian Home Loans** → AI Intelligence tab | Sales Pipeline |
-| Header button **Continue to Guided Selling →** (or **Complete Qualification →** while data is missing) | Lead workspace |
-| Quote Context review → Continue → the same customer appears in Guided Selling: Accept → Customer 360 → Contract → Signing → Renewal | Guided Selling |
+| Header button **Continue to Contract →** (or **Complete Qualification →** while data is missing). Admin only | Lead workspace |
+| Quote Context review → Continue → the same customer appears in **Ready to Contract**: Accept handoff → Customer 360 → Contract → Signing → Renewal | Ready to Contract |
+
+## Roles
+
+`app_users.role` is either `admin` or `sales`. A Sales User works the lifecycle up to
+Scheduled Tasks; an Admin additionally has Ready to Contract and the handoff into the
+contract module. Seeded: Sandhya is Admin, Sadhana and Marcus Lee are Sales Users.
 
 ## Checks
 - `npm run eval:ai` — 9 realistic opportunities; fails on any invented figure, pricing language, unresolvable citation, missed gap/conflict or wrong readiness. Add `-- --claude` to run them through Claude too.
 
 ## If something doesn't start
-- `address already in use` on 8001 → another copy of the Guided Selling module is running; `lsof -nP -iTCP:8001 -sTCP:LISTEN`, then `kill <PID>` and rerun.
+- `address already in use` on 8001 → another copy of the contract module is running; `lsof -nP -iTCP:8001 -sTCP:LISTEN`, then `kill <PID>` and rerun.
 - `connection refused … 5432` → Postgres isn't running, or `DATABASE_URL` in `.env.local` is wrong.
 - Login page loads but sign-in fails → run `npm run db:seed` to create the demo users.
+- **Ready to Contract** missing from the left nav → you are signed in as a Sales User. That entry, the quote handoff and the contract module behind it are Admin-only, enforced in the pages, the server actions, the APIs and `src/proxy.ts`. Sign in as `sandhya@experience.com`.
 
 Handoff contract: `docs/QUOTE_HANDOFF.md` · Full details: `README.md`

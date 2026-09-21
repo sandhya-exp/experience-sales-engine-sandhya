@@ -4,13 +4,13 @@ import { listLeadRows } from "@/lib/repo/leads";
 import { listContactsForCompany } from "@/lib/repo/contacts";
 import { headers } from "next/headers";
 import { getCurrentUser } from "@/lib/auth";
-import { getQuoteWorkspaceConfig, quoteWorkspaceUrlFor, accountKeyFor, buildHandoffPayload, deliverHandoff } from "@/lib/handoff";
+import { getQuoteWorkspaceConfig, accountKeyFor, buildHandoffPayload, deliverHandoff } from "@/lib/handoff";
 import { computeReadiness } from "@/lib/readiness";
 import { DOWNSTREAM } from "@/lib/modules";
 import { formatActivityTime } from "@/lib/format";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import { quoteModuleStatus } from "@/lib/quote-module";
+import { quoteModuleStatus, moduleEmbedPath, MODULE_MOUNT } from "@/lib/quote-module";
 import { QuoteModulePanel } from "@/components/workspace/quote-module-panel";
 
 /**
@@ -32,8 +32,14 @@ export default async function GuidedSellingPage({ searchParams }: { searchParams
     const contacts = await listContactsForCompany(r.company_id);
     if (computeReadiness(r, contacts).complete) ready.push(r);
   }
+  // Same-origin path: the module is proxied through this app (next.config.ts),
+  // so the browser only ever talks to one server and this URL is correct both
+  // locally and deployed.
   const urlFor = (r: (typeof rows)[number]) =>
-    quoteWorkspaceUrlFor(accountKeyFor({ id: r.company_id, name: r.company_name, domain: r.company_domain, industry: r.company_industry, created_at: r.created_at }), r.id);
+    moduleEmbedPath(
+      accountKeyFor({ id: r.company_id, name: r.company_name, domain: r.company_domain, industry: r.company_industry, created_at: r.created_at }),
+      r.id
+    );
 
   const current = inModule.find((r) => r.id === selected) ?? null;
   // One shared probe (retries once, real timeout) — a module that is merely
@@ -50,7 +56,7 @@ export default async function GuidedSellingPage({ searchParams }: { searchParams
     const payload = await buildHandoffPayload(current.id, user?.name ?? "System", origin);
     if (payload) await deliverHandoff(payload);
   }
-  const embedSrc = cfg.baseUrl ? withEmbed((current && urlFor(current)) ?? cfg.baseUrl) : null;
+  const embedSrc = cfg.baseUrl ? (current ? urlFor(current) : MODULE_MOUNT) : null;
 
   return (
     <div className="flex h-[calc(100vh-3.5rem)] min-h-0">
@@ -126,10 +132,6 @@ export default async function GuidedSellingPage({ searchParams }: { searchParams
       </section>
     </div>
   );
-}
-
-function withEmbed(url: string): string {
-  return `${url}${url.includes("?") ? "&" : "?"}embed=1`;
 }
 
 async function moduleKnows(baseUrl: string, leadId: string): Promise<boolean> {

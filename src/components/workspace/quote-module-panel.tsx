@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { AlertTriangle, ExternalLink, Loader2, RefreshCcw, Terminal } from "lucide-react";
 import { DOWNSTREAM } from "@/lib/modules";
-import type { QuoteModuleStatus } from "@/lib/quote-module";
+import { MODULE_MOUNT, type QuoteModuleStatus } from "@/lib/quote-module";
 import { cn } from "@/lib/utils";
 
 /**
@@ -199,7 +199,7 @@ function Diagnostic({
           </button>
           {status.baseUrl && (
             <a
-              href={status.baseUrl}
+              href={MODULE_MOUNT}
               target="_blank"
               rel="noreferrer"
               className="inline-flex items-center gap-1 text-[13px] font-medium text-primary hover:underline"

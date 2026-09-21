@@ -1,5 +1,3 @@
-import { getQuoteWorkspaceConfig } from "@/lib/handoff";
-
 /**
  * Reachability of the quote module (modules/guided-selling — Sadhana's FastAPI
  * app) from *this server*.
@@ -33,11 +31,40 @@ export interface QuoteModuleStatus {
   checkedAt: string;
 }
 
+/**
+ * Where the module is mounted on *this* origin. The workspace proxies it (see
+ * next.config.ts), so the browser only ever talks to one server, and the embed
+ * URL is a relative path that works identically on localhost and on a deployed
+ * domain. Server-to-server calls (the handoff push, the health probe) still go
+ * straight to QUOTE_WORKSPACE_URL — there is no reason to loop those through
+ * the proxy, and probing directly is what tells "module down" apart from
+ * "proxy misconfigured".
+ */
+export const MODULE_MOUNT = "/quote-module";
+
+/** The same-origin URL that embeds the module for one opportunity. */
+export function moduleEmbedPath(accountKey: string, leadId: string, opts: { embed?: boolean } = {}): string {
+  const p = new URLSearchParams({ lead_id: leadId, customer_id: accountKey });
+  if (opts.embed !== false) p.set("embed", "1");
+  return `${MODULE_MOUNT}?${p.toString()}`;
+}
+
 export const START_COMMAND = "npm run dev";
 export const START_COMMAND_MODULE_ONLY =
   "cd modules/guided-selling && .venv/bin/uvicorn app.main:app --port 8001";
 
 const ATTEMPT_TIMEOUT_MS = 4000;
+
+/**
+ * Read the module's URL straight from the environment rather than through
+ * lib/handoff, which reaches the database. This file is imported by a client
+ * component for MODULE_MOUNT, so it must stay free of server-only dependencies
+ * or `pg` ends up in the browser bundle.
+ */
+function moduleBaseUrl(): string | null {
+  const v = process.env.QUOTE_WORKSPACE_URL?.trim().replace(/\/$/, "");
+  return v ? v : null;
+}
 
 async function probe(url: string): Promise<{ ok: boolean; detail: string | null }> {
   try {
@@ -51,7 +78,7 @@ async function probe(url: string): Promise<{ ok: boolean; detail: string | null 
 }
 
 export async function quoteModuleStatus(): Promise<QuoteModuleStatus> {
-  const baseUrl = getQuoteWorkspaceConfig().baseUrl;
+  const baseUrl = moduleBaseUrl();
   const base = {
     baseUrl,
     startCommand: START_COMMAND,

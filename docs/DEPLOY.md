@@ -1,42 +1,78 @@
 # Deploying the Sales Engine publicly
 
-Three services, all free tiers:
+**One application, one deployment, one URL.** The Next.js workspace and the
+quote module (FastAPI) ship in a single container built from the `Dockerfile` at
+the repo root. The module listens on the container's loopback; the workspace
+proxies it (`next.config.ts`) and is the only public listener. From outside —
+and to a judge — there is one service.
+
+Two pieces to set up:
 
 | Piece | Host | Why |
 |---|---|---|
 | Postgres | Supabase | Competition stack; `DATABASE_URL` is the only change |
-| Lead & Deal Workspace (Next.js) | Vercel | Native Next.js hosting |
-| Guided Selling module (FastAPI) | Render | `render.yaml` at the repo root; in-memory store |
+| The whole Sales Engine | Render (Docker) | One service, `render.yaml` at the repo root |
+
+Python cannot run inside Node, so there are still two processes inside the
+container. `scripts/start.mjs` supervises them: if either stops, the container
+stops, so the platform restarts a whole healthy instance rather than serving a
+half-working product.
 
 ## 1. Supabase
-1. New project → Settings → Database → **Connection string → URI** (use the *Session pooler* or direct URI, port 5432). Replace `[YOUR-PASSWORD]`.
+
+1. New project → Settings → Database → **Connection string → URI** (Session
+   pooler or direct URI, port 5432). Replace `[YOUR-PASSWORD]`.
 2. From your Mac, apply schema + seed once:
    ```bash
    DATABASE_URL='postgres://…supabase…:5432/postgres' npm run db:setup
    ```
 
-## 2. Render (Guided Selling module)
-1. New → **Blueprint** → connect the GitHub repo → it reads `render.yaml`.
-2. Set `HANDOFF_API_KEY` to a long random string. Note the service URL, e.g. `https://sales-engine-guided-selling.onrender.com`.
+## 2. Render
 
-## 3. Vercel (workspace)
-1. New project → import the GitHub repo (framework: Next.js, root `/`).
-2. Environment variables:
-   - `DATABASE_URL` — Supabase URI from step 1
-   - `SESSION_SECRET` — long random string
-   - `QUOTE_WORKSPACE_URL` — Render URL from step 2
-   - `HANDOFF_API_KEY` — same value as Render
-   - `INBOUND_API_KEY` — any random string
-   - `ANTHROPIC_API_KEY` — your key (AI stages run on Claude; omit for deterministic)
-   - `NEXT_PUBLIC_STAGE_NAME=Guided Selling`, `NEXT_PUBLIC_PARTNER_MODULE_NAME=Guided Selling`
-   - `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` / `GOOGLE_ALLOWED_DOMAINS=experience.com` (optional)
-   - Discovery-call booking: `GOOGLE_SERVICE_ACCOUNT_JSON`, `SALES_CALENDARS`, `SALES_TIMEZONE`, optionally `GOOGLE_CALENDAR_IMPERSONATE` and `SALES_BOOKING_CALENDAR` (see `.env.example`). Without them the confirmation page shows "Demo availability".
-3. Deploy. Note the URL, e.g. `https://sales-engine-xyz.vercel.app`.
-4. Google Cloud → OAuth client → add `https://<vercel-url>` to JavaScript origins and `https://<vercel-url>/api/auth/google/callback` to redirect URIs (only if Google sign-in is used).
+1. Push to GitHub.
+2. New → **Blueprint** → connect the repo → it reads `render.yaml` and builds
+   the Dockerfile. One web service, no second service to wire up.
+3. Set the environment variables Render marks as required:
+   - `DATABASE_URL` — the Supabase URI from step 1.
+   - `SESSION_SECRET`, `HANDOFF_API_KEY` — Render generates both; leave them.
+   - Optional: `ANTHROPIC_API_KEY` (without it the AI runs deterministically and
+     the badge says so), `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` /
+     `GOOGLE_ALLOWED_DOMAINS` for Google sign-in, and the calendar variables in
+     `GOOGLE-CALENDAR.md`.
 
-## 4. Verify the live URL end to end
-- `/inquire` → submit → sign in → new lead in Sales Pipeline and 🔔
-- Meridian Home Loans → AI Intelligence (badge shows **Claude · …** when the key is set)
-- **Continue to Guided Selling →** → Quote Context → module opens embedded with the same customer
+   Do **not** set `QUOTE_WORKSPACE_URL`. It is pinned in the Dockerfile to the
+   container's loopback: `next.config.ts` bakes the proxy destinations at build
+   time and `scripts/start.mjs` derives the module's listen port from the same
+   value, so the two cannot drift. Overriding it from the dashboard is how you
+   would get a Quote Ready page that 500s with nothing in the logs.
 
-Notes: Render's free tier sleeps after inactivity — the first Guided Selling open may take ~30 s; the workspace page shows "module starting" and re-delivers the handoff automatically. The module's store is in-memory, so it resets on restart; the workspace re-sends the context when it notices.
+4. If you use Google sign-in, add `https://<your-service>.onrender.com/api/auth/google/callback`
+   to the OAuth client's authorised redirect URIs, and the origin alongside it.
+
+## 3. Verify the live URL
+
+Open the Render URL and walk the whole flow on the deployed site, not locally:
+
+1. `/inquire` — submit a Talk to Sales inquiry, book a discovery slot.
+2. Sign in, confirm the inquiry is on Home and in the pipeline.
+3. Open the opportunity: AI Opportunity Intelligence, qualification.
+4. **Quote Ready** — the module must render in the right-hand panel on the same
+   customer. This is the one to check: it is the only part that depends on the
+   proxy.
+5. Submit that URL on the intake form. It is the whole product.
+
+## Notes
+
+- Render's free tier sleeps after inactivity; the first request after a sleep
+  takes ~30 s while the container starts. Open the live URL a minute before a
+  demo.
+- The module's store is in memory, so it resets when the container restarts. The
+  workspace notices and re-delivers the quote context for the opportunity you
+  open, so the same customer reappears — never a second one.
+- Local development is unchanged: `npm run dev` runs the same two processes with
+  hot reload. `scripts/start.mjs` is the production entrypoint only.
+- To run the container locally exactly as Render will:
+  ```bash
+  docker build -t sales-engine .
+  docker run -p 3000:3000 -e DATABASE_URL='…' -e SESSION_SECRET=dev sales-engine
+  ```

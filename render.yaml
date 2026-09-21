@@ -1,16 +1,40 @@
-# Render blueprint for the Guided Selling module (FastAPI, in-memory store).
-# The Next.js workspace is deployed on Vercel; set its QUOTE_WORKSPACE_URL to this service's URL.
+# Render blueprint: ONE service for the whole Sales Engine.
+#
+# The Next.js workspace and the quote module (FastAPI) run in a single
+# container built from the Dockerfile at the repo root. The module listens on
+# the container's loopback; the workspace proxies it and is the only public
+# listener. One deploy, one URL, one log stream — nothing to configure between
+# the two halves, because there is no gap between them to configure.
 services:
   - type: web
-    name: sales-engine-guided-selling
-    runtime: python
-    rootDir: modules/guided-selling
+    name: experience-sales-engine
+    runtime: docker
+    dockerfilePath: ./Dockerfile
     plan: free
-    buildCommand: pip install -r requirements.txt
-    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
-    healthCheckPath: /
+    healthCheckPath: /login
     envVars:
-      - key: HANDOFF_API_KEY
+      # Supabase connection string.
+      - key: DATABASE_URL
         sync: false
-      - key: PYTHON_VERSION
-        value: "3.12.4"
+      - key: SESSION_SECRET
+        generateValue: true
+      # Shared secret for the handoff push (workspace -> module, in-container).
+      - key: HANDOFF_API_KEY
+        generateValue: true
+      # Optional: AI Opportunity Intelligence runs deterministically without it.
+      - key: ANTHROPIC_API_KEY
+        sync: false
+      # Optional: Google sign-in. Add the deployed callback URL to the OAuth client.
+      - key: GOOGLE_CLIENT_ID
+        sync: false
+      - key: GOOGLE_CLIENT_SECRET
+        sync: false
+      - key: GOOGLE_ALLOWED_DOMAINS
+        sync: false
+      # Optional: real discovery-call availability (docs/GOOGLE-CALENDAR.md).
+      - key: GOOGLE_SERVICE_ACCOUNT_JSON
+        sync: false
+      - key: GOOGLE_CALENDAR_IMPERSONATE
+        sync: false
+      - key: SALES_TIMEZONE
+        value: America/New_York

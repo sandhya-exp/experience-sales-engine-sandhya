@@ -10,6 +10,8 @@ import { DOWNSTREAM } from "@/lib/modules";
 import { formatActivityTime } from "@/lib/format";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { quoteModuleStatus } from "@/lib/quote-module";
+import { QuoteModulePanel } from "@/components/workspace/quote-module-panel";
 
 /**
  * Quote Ready — the handoff boundary. Left: opportunities already in Quote Ready
@@ -34,7 +36,10 @@ export default async function GuidedSellingPage({ searchParams }: { searchParams
     quoteWorkspaceUrlFor(accountKeyFor({ id: r.company_id, name: r.company_name, domain: r.company_domain, industry: r.company_industry, created_at: r.created_at }), r.id);
 
   const current = inModule.find((r) => r.id === selected) ?? null;
-  const moduleUp = cfg.baseUrl ? await moduleReachable(cfg.baseUrl) : false;
+  // One shared probe (retries once, real timeout) — a module that is merely
+  // still starting must not be reported as stopped.
+  const moduleStatus = await quoteModuleStatus();
+  const moduleUp = moduleStatus.state === "ok";
   // The module keeps its inbox in memory: if it was restarted (or was down when
   // the opportunity was handed off), re-deliver the same quote context so the
   // same customer/opportunity appears there — never a second one.
@@ -117,13 +122,7 @@ export default async function GuidedSellingPage({ searchParams }: { searchParams
           )}
         </div>
 
-        {!cfg.baseUrl ? (
-          <Empty>{DOWNSTREAM.partner} isn&apos;t configured on this environment.</Empty>
-        ) : !moduleUp ? (
-          <Empty>{DOWNSTREAM.partner} isn&apos;t running right now.</Empty>
-        ) : (
-          <iframe key={embedSrc ?? "module"} src={embedSrc ?? undefined} title={DOWNSTREAM.partner} className="h-full w-full flex-1 border-0 bg-background" />
-        )}
+        <QuoteModulePanel key={embedSrc ?? "none"} status={moduleStatus} embedSrc={embedSrc} />
       </section>
     </div>
   );
@@ -142,15 +141,6 @@ async function moduleKnows(baseUrl: string, leadId: string): Promise<boolean> {
   }
 }
 
-async function moduleReachable(baseUrl: string): Promise<boolean> {
-  try {
-    const res = await fetch(`${baseUrl}/api/health`, { cache: "no-store", signal: AbortSignal.timeout(1500) });
-    return res.ok;
-  } catch {
-    return false;
-  }
-}
-
 function Section({ title, count, empty, children }: { title: string; count: number; empty: string; children: React.ReactNode }) {
   return (
     <section className="mt-6">
@@ -163,10 +153,3 @@ function Section({ title, count, empty, children }: { title: string; count: numb
   );
 }
 
-function Empty({ children }: { children: React.ReactNode }) {
-  return (
-    <div className="flex flex-1 items-center justify-center p-10">
-      <p className="text-sm text-muted-foreground">{children}</p>
-    </div>
-  );
-}

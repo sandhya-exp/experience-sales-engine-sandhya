@@ -139,7 +139,7 @@ export async function ensureSeedOwnerAssigned(leadId: string, ownerUserId: strin
 
 /**
  * Hand a lead to a team member (or back to Unassigned). Logged on the timeline
- * so coverage changes — "Priya is on leave, Marcus takes Nova" — are visible.
+ * so coverage changes — "Sadhana is on leave, Marcus takes Nova" — are visible.
  */
 export async function assignLeadOwner(
   leadId: string,

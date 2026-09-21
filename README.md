@@ -23,7 +23,7 @@ npm run db:setup                  # applies db/schema.sql (reading DATABASE_URL 
 npm run dev                       # http://localhost:3000
 ```
 
-Sign in as **sandhya@experience.com** / **demo1234** (Admin — the full lifecycle, including Ready to Contract), or as **priya@experience.com** / **demo1234** (Sales User — the lifecycle up to Scheduled Tasks).
+Sign in as **sandhya@experience.com** / **demo1234** (Admin — the full lifecycle, including Ready to Contract), or as **sadhana@experience.com** / **demo1234** (Sales User — the lifecycle up to Scheduled Tasks).
 
 Re-run `npm run db:seed` at any time to reset to a clean demo state (5 companies across New / Contacted / Needs Attention / Quoted / Won).
 
@@ -77,7 +77,7 @@ The header's primary action is **Continue to Guided Selling →**: it verifies t
 
 Every lead has an **Owner**. New inquiries are routed automatically (`src/lib/routing.ts`): the team member who covers that industry gets it ("Assigned to Sandhya (Dental specialist)" on the timeline); if nobody covers it, whoever has the fewest open deals does. Any team member can hand a deal to anyone else from the **Owner** control in the lead header, with an optional reason ("covering while Sandhya is on leave") — the change is logged so coverage is always visible. The sidebar's **Team** section filters the pipeline to *My leads*, a colleague's book, or *Unassigned*.
 
-Demo team (all password `demo1234`): sandhya@ (Admin), priya@ and marcus@experience.com (Sales User).
+Demo team (all password `demo1234`): sandhya@ (Admin), sadhana@ and marcus@experience.com (Sales User).
 
 ## Roles and access
 

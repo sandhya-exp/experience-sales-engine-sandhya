@@ -8,11 +8,11 @@ import type { TeamMember } from "@/lib/repo/users";
  *      once their leads are reassigned and they're not listed here).
  * Kept as configuration rather than a table: this is the Admin discipline's
  * data to own eventually; for the Sales Engine it only needs to be honest and
- * visible ("Assigned to Priya — Real Estate specialist" on the timeline).
+ * visible ("Assigned to Sadhana — Real Estate specialist" on the timeline).
  */
 export const SECTOR_COVERAGE: Record<string, string[]> = {
   "sandhya@experience.com": ["Insurance", "Mortgage", "Financial Services", "Healthcare", "Dental"],
-  "priya@experience.com": ["Real Estate", "Hotels & Hospitality", "Restaurants", "Salons & Spas", "Gyms & Fitness"],
+  "sadhana@experience.com": ["Real Estate", "Hotels & Hospitality", "Restaurants", "Salons & Spas", "Gyms & Fitness"],
   "marcus@experience.com": ["Retail & E-commerce", "Jewellery", "Education", "Professional Services", "Legal", "Automotive", "Home Services"],
 };
 

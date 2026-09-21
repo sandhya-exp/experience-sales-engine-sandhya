@@ -41,12 +41,12 @@ async function main() {
   // Two teammates, so ownership, coverage and sector routing have somewhere to go.
   const { rows: teamRows } = await pool.query(
     `insert into app_users (name, email, password_hash, role) values
-       ('Priya Nair', 'priya@experience.com', $1, 'sales'),
+       ('Sadhana', 'sadhana@experience.com', $1, 'sales'),
        ('Marcus Lee', 'marcus@experience.com', $1, 'sales')
      returning id, email`,
     [passwordHash]
   );
-  const priyaId = teamRows.find((r: { email: string }) => r.email === "priya@experience.com")!.id as string;
+  const sadhanaId = teamRows.find((r: { email: string }) => r.email === "sadhana@experience.com")!.id as string;
 
   // --- Acme Corporation: fully qualified, ready for the demo's happy path ---
   const acme = await findOrCreateCompanyForEmail("Acme Corporation", "john@acme.com", "Insurance");
@@ -192,7 +192,7 @@ async function main() {
     interest: "Online Listings",
     requirements: "Want to sync listing data and manage reviews for 12 agents.",
   });
-  await ensureSeedOwnerAssigned(brightLead.id, priyaId);
+  await ensureSeedOwnerAssigned(brightLead.id, sadhanaId);
   await recordActivity({
     leadId: brightLead.id,
     type: "call",

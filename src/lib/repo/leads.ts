@@ -7,7 +7,7 @@ export interface CreateLeadInput {
   primaryContactId: string;
   numberOfUsers: number;
   interest: string;
-  requirements: string;
+  requirements: string | null;
   additionalInfo?: string | null;
   /** Where the inquiry came from, for the timeline: "website inquiry form", "API (branvidia)", … */
   source?: string;

@@ -30,6 +30,7 @@ Three services, all free tiers:
    - `ANTHROPIC_API_KEY` — your key (AI stages run on Claude; omit for deterministic)
    - `NEXT_PUBLIC_STAGE_NAME=Guided Selling`, `NEXT_PUBLIC_PARTNER_MODULE_NAME=Guided Selling`
    - `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` / `GOOGLE_ALLOWED_DOMAINS=experience.com` (optional)
+   - Discovery-call booking: `GOOGLE_SERVICE_ACCOUNT_JSON`, `SALES_CALENDARS`, `SALES_TIMEZONE`, optionally `GOOGLE_CALENDAR_IMPERSONATE` and `SALES_BOOKING_CALENDAR` (see `.env.example`). Without them the confirmation page shows "Demo availability".
 3. Deploy. Note the URL, e.g. `https://sales-engine-xyz.vercel.app`.
 4. Google Cloud → OAuth client → add `https://<vercel-url>` to JavaScript origins and `https://<vercel-url>/api/auth/google/callback` to redirect URIs (only if Google sign-in is used).
 

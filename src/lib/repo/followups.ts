@@ -14,6 +14,21 @@ export interface FollowUp {
   title: string;
   source: "customer" | "rep";
   completed: boolean;
+  /** Present when the booking went through the calendar layer (src/lib/calendar). */
+  calendar?: FollowUpCalendar;
+}
+
+export interface FollowUpCalendar {
+  provider: "google" | "local";
+  event_id: string | null;
+  html_link: string | null;
+  rep_email: string | null;
+  rep_name: string | null;
+  customer_timezone: string | null;
+  duration_minutes: number;
+  /** Whether the calendar provider sent invitations to the attendees. */
+  invited: boolean;
+  note?: string;
 }
 
 export const FOLLOW_UP_KIND = "follow_up";
@@ -25,6 +40,8 @@ export async function scheduleFollowUp(input: {
   note?: string | null;
   actorName: string;
   source: "customer" | "rep";
+  /** Calendar booking details to keep with the follow-up (event id, link, rep, customer time zone). */
+  calendar?: FollowUpCalendar;
 }): Promise<Activity> {
   const title = input.title?.trim() || "Discovery call";
   return recordActivity({
@@ -37,6 +54,7 @@ export async function scheduleFollowUp(input: {
       title,
       scheduled_for: input.scheduledFor.toISOString(),
       source: input.source,
+      ...(input.calendar ? { calendar: input.calendar } : {}),
     },
   });
 }
@@ -63,6 +81,7 @@ export async function nextFollowUpFor(leadId: string): Promise<FollowUp | null> 
     title: String(row.metadata.title ?? "Follow-up"),
     source: (row.metadata.source as "customer" | "rep") ?? "rep",
     completed: Boolean(row.metadata.completed),
+    calendar: (row.metadata.calendar as FollowUpCalendar | undefined) ?? undefined,
   };
 }
 

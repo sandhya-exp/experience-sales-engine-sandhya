@@ -1,4 +1,4 @@
-import { CalendarClock, AlertTriangle, Check } from "lucide-react";
+import { CalendarClock, AlertTriangle, Check, ExternalLink } from "lucide-react";
 import { completeFollowUpAction } from "@/app/actions/followups";
 import { formatScheduledTime } from "@/lib/format";
 import type { FollowUp } from "@/lib/repo/followups";
@@ -27,7 +27,23 @@ export function FollowUpChip({ leadId, followUp }: { leadId: string; followUp: F
         <span className="font-semibold">{overdue ? `Missed ${followUp.title.toLowerCase()}` : followUp.title}</span>
         <span className="text-muted-foreground"> · {formatScheduledTime(followUp.scheduledFor)}</span>
         {followUp.source === "customer" && <span className="text-muted-foreground"> · booked by customer</span>}
+        {followUp.calendar?.rep_name && <span className="text-muted-foreground"> · {followUp.calendar.rep_name}</span>}
+        {followUp.calendar?.customer_timezone && (
+          <span className="text-muted-foreground" title={`Customer's time zone: ${followUp.calendar.customer_timezone}`}>
+            {" "}· {new Intl.DateTimeFormat("en-US", { timeZone: followUp.calendar.customer_timezone, hour: "numeric", minute: "2-digit", timeZoneName: "short" }).format(new Date(followUp.scheduledFor))} for the customer
+          </span>
+        )}
       </span>
+      {followUp.calendar?.provider === "google" && followUp.calendar.html_link && (
+        <a href={followUp.calendar.html_link} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-xs font-medium text-primary hover:bg-card" title={followUp.calendar.invited ? "Google Calendar event · invitations sent" : "Google Calendar event · send the invitation to the customer"}>
+          <ExternalLink className="h-3 w-3" /> Google Calendar
+        </a>
+      )}
+      {followUp.calendar?.provider === "local" && (
+        <span className="rounded bg-warning/10 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-warning" title="Booked against demo availability — Google Calendar is not configured">
+          demo
+        </span>
+      )}
       <form action={completeFollowUpAction.bind(null, leadId, followUp.activityId)}>
         <button
           type="submit"

@@ -66,7 +66,8 @@ The header's primary action is **Continue to Guided Selling →**: it verifies t
 | Seed data | `db/seed.ts` |
 | Data access | `src/lib/db.ts` (one Postgres boundary) and `src/lib/repo/*` |
 | Server actions | `src/app/actions/*.ts` |
-| Customer intake | `src/app/inquire/` |
+| Talk to Sales (customer) | `src/app/inquire/`, `src/components/inquire/`, `src/lib/inquiry-schema.ts` |
+| Discovery-call booking | `src/lib/calendar/` (provider boundary, Google, local fallback, availability, booking), `src/app/api/availability/` |
 | Dashboard | `src/app/(app)/page.tsx`, `src/components/dashboard/` |
 | Lead workspace | `src/app/(app)/leads/[id]/`, `src/components/workspace/` |
 | Quote handoff | `src/app/(app)/leads/[id]/quote/page.tsx` |
@@ -78,9 +79,18 @@ Every lead has an **Owner**. New inquiries are routed automatically (`src/lib/ro
 
 Demo team (all password `demo1234`): sandhya@, priya@, marcus@experience.com.
 
-## Booked follow-ups
+## Talk to Sales and discovery-call booking
 
-A prospect can pick a 30-minute discovery-call slot right after submitting the inquiry (`/inquire/thank-you`); a rep can **Schedule** one from the lead header or Activity tab. A booking is a `call` activity with `metadata.kind = "follow_up"` — no new table. It shows as a chip in the lead header, a line in the pipeline row, "Call booked" on the timeline, and drives the AI's next action ("Prepare for the discovery call…"). A booked time that passes with nothing logged becomes **Missed follow-up** in Needs attention, and the brief switches to "Reschedule…". **Mark done** clears it.
+The customer-facing entry point is **Talk to Sales** (`/inquire`; `/talk-to-sales` redirects there). Required: company, full name, work email, industry (select), number of users, what they're interested in. Optional: phone, what they're looking to achieve, additional information. Every field is controlled and validated inline against the same zod schema the server uses (`src/lib/inquiry-schema.ts`) — an invalid email shows its message under the field and nothing else changes; no reload, no reset.
+
+On the confirmation page the customer can book a **discovery call** from the sales team's real availability:
+
+- `src/lib/calendar/` is the boundary. `GoogleCalendarProvider` reads free/busy for the configured rep calendars and creates the event through the Google Calendar API with a service account (plain REST, like Google sign-in). `LocalAvailabilityProvider` is the development fallback — business hours minus bookings already in this database — and is labelled **"Demo availability — Google Calendar not configured"** to the customer and the sales side. The app never claims Google is connected when it isn't.
+- Slots are the team's business hours (`SALES_TIMEZONE`, `SALES_HOURS`, `DISCOVERY_SLOT_MINUTES`) where at least `SALES_MIN_FREE_REPS` reps are free. The customer only ever sees times — never who is free or any event detail — shown in **their** time zone (detected in the browser) with the team's zone noted.
+- Booking re-verifies the slot against live free/busy, assigns the lead's owner if free (else the first free rep), creates the event with the customer and rep as attendees (`sendUpdates=all`), and stores the appointment on the opportunity as a follow-up with the calendar details (`metadata.calendar`: event id, link, rep, customer time zone, whether invitations went out). The workspace header, timeline and AI next action all read that follow-up.
+- Without domain-wide delegation Google refuses attendee lists from service accounts; the app then creates the event on the team calendar without attendees and tells the rep to send the invite.
+
+Configuration is in `.env.example` (service account key, `SALES_CALENDARS`, `GOOGLE_CALENDAR_IMPERSONATE`, `SALES_BOOKING_CALENDAR`).
 
 ## Sign in
 

@@ -6,7 +6,7 @@ import { LoginForm } from "@/components/login/login-form";
 /**
  * Internal sign-in for the sales / customer-success team. Two panels: the form,
  * and a quiet product panel that shows what the workspace is for (the pipeline
- * itself, not a mascot). Customers never land here — they use /inquire.
+ * itself, not a mascot). Customers never land here — they use Talk to Sales (/inquire).
  */
 export default async function LoginPage({ searchParams }: PageProps<"/login">) {
   const sp = await searchParams;
@@ -54,7 +54,7 @@ export default async function LoginPage({ searchParams }: PageProps<"/login">) {
           <div className="mt-8 border-t border-border pt-5 text-[13px] text-muted-foreground">
             Looking to talk to Experience.com about your business?{" "}
             <Link href="/inquire" className="inline-flex items-center gap-1 font-medium text-primary hover:underline">
-              Send us an inquiry <ArrowRight className="h-3.5 w-3.5" />
+              Talk to Sales <ArrowRight className="h-3.5 w-3.5" />
             </Link>
           </div>
         </div>

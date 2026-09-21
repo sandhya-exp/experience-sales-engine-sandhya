@@ -26,7 +26,7 @@ export function Hint({ text, className }: { text: string; className?: string }) 
 /** One definition per qualification field, used by the Quote Context grid, the AI gaps and the Qualification form. */
 export const FIELD_HINTS: Record<string, string> = {
   customer: "The company this opportunity belongs to. One company can have several contacts and opportunities.",
-  industry: "The sector the customer chose on the inquiry form. Drives owner routing and which integrations are likely.",
+  industry: "The sector the customer chose on the Talk to Sales form. Drives owner routing and which integrations are likely.",
   users: "How many people will use the platform — the main driver of licence quantity.",
   primary_need: "The capability the customer is buying first. The configuration is built around this.",
   deployment: "How the rollout is spread — number of locations, branches, clinics or teams, as stated by the customer.",

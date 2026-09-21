@@ -102,3 +102,18 @@ export async function listOverdueMeetings(limit = 50): Promise<ScheduledItem[]> 
     .map(toItem)
     .filter((m) => !m.lastActivityAt || new Date(m.lastActivityAt).getTime() <= new Date(m.scheduledFor).getTime());
 }
+
+/**
+ * Every booked call inside a window, for the week grid. Same record as the
+ * lists above — a follow-up activity — read by time range instead of by
+ * "ahead of now" / "behind now", because a week view has to show both.
+ */
+export async function listMeetingsBetween(from: Date, to: Date): Promise<ScheduledItem[]> {
+  const rows = await query<Row>(
+    `${BASE} and (a.metadata->>'scheduled_for')::timestamptz >= $2
+       and (a.metadata->>'scheduled_for')::timestamptz < $3
+     order by (a.metadata->>'scheduled_for')::timestamptz asc`,
+    [FOLLOW_UP_KIND, from.toISOString(), to.toISOString()]
+  );
+  return rows.map(toItem);
+}

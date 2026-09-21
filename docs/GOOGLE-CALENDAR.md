@@ -59,6 +59,25 @@ address with **"See only free/busy (hide details)"**.
 That permission is enough for availability. The one calendar the event is
 actually created on needs **"Make changes to events"** instead.
 
+### 2b. When the organisation blocks sharing outside the domain
+
+A Workspace admin can switch off sharing calendars outside the organisation. A
+service account counts as outside, so in the share dialog every option except
+**"See only free/busy"** is greyed out. Availability still works — that is the
+permission it needs — but the event has nowhere to be created.
+
+The way through is a calendar the service account owns itself, which no policy
+blocks:
+
+```bash
+npm run gcal:check     # authenticates, and says which sales calendars are really shared
+npm run gcal:setup     # the above, plus creates the booking calendar and shares it back to you
+```
+
+`gcal:setup` prints a `SALES_BOOKING_CALENDAR=` line to paste into `.env.local`, and
+grants your own account writer access so bookings appear in your Google Calendar
+once you subscribe to that id (Other calendars → + → Subscribe to calendar).
+
 ### 3. Invitations (optional but recommended)
 
 A bare service account may create an event but Google will refuse to let it

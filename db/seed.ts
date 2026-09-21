@@ -33,16 +33,16 @@ async function main() {
   console.log("Creating demo user...");
   const passwordHash = await bcrypt.hash("demo1234", 10);
   const { rows: userRows } = await pool.query(
-    `insert into app_users (name, email, password_hash) values ($1, $2, $3) returning id`,
+    `insert into app_users (name, email, password_hash, role) values ($1, $2, $3, 'admin') returning id`,
     ["Sandhya", "sandhya@experience.com", passwordHash]
   );
   const ownerId = userRows[0].id as string;
 
   // Two teammates, so ownership, coverage and sector routing have somewhere to go.
   const { rows: teamRows } = await pool.query(
-    `insert into app_users (name, email, password_hash) values
-       ('Priya Nair', 'priya@experience.com', $1),
-       ('Marcus Lee', 'marcus@experience.com', $1)
+    `insert into app_users (name, email, password_hash, role) values
+       ('Priya Nair', 'priya@experience.com', $1, 'sales'),
+       ('Marcus Lee', 'marcus@experience.com', $1, 'sales')
      returning id, email`,
     [passwordHash]
   );

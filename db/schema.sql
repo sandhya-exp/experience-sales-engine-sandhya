@@ -24,8 +24,21 @@ create table if not exists app_users (
   name text not null,
   email text not null unique,
   password_hash text not null,
+  -- 'sales' works the lifecycle up to Scheduled Tasks; 'admin' additionally
+  -- has Ready to Contract and the handoff. Least privilege by default.
+  role text not null default 'sales',
   created_at timestamptz not null default now()
 );
+
+-- Idempotent for databases created before the role existed.
+alter table app_users add column if not exists role text not null default 'sales';
+
+do $$
+begin
+  if not exists (select 1 from pg_constraint where conname = 'app_users_role_check') then
+    alter table app_users add constraint app_users_role_check check (role in ('admin', 'sales'));
+  end if;
+end $$;
 
 create table if not exists companies (
   id uuid primary key default gen_random_uuid(),

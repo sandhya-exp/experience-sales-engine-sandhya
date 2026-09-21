@@ -20,6 +20,7 @@ export function LeadHeader({
   team,
   contacts,
   focusField,
+  canContract,
 }: {
   lead: Lead;
   company: Company;
@@ -28,6 +29,8 @@ export function LeadHeader({
   team: TeamMember[];
   contacts: Contact[];
   focusField: QualField | null;
+  /** Admin only: the Continue to Contract handoff. Qualification itself is everyone's. */
+  canContract: boolean;
 }) {
   const readiness = computeReadiness(lead, contacts);
   const initials = company.name
@@ -61,6 +64,7 @@ export function LeadHeader({
               status={lead.status}
               complete={readiness.complete}
               focusField={focusField}
+              canContract={canContract}
             />
           </div>
         </div>

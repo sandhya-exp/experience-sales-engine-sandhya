@@ -19,7 +19,7 @@ import { getKnowledgeDoc } from "@/lib/ai/knowledge/index";
  * how each stage ran and what the evaluator concluded. Process metadata only —
  * never chain-of-thought.
  */
-export function AiBriefCard({ brief, leadId }: { brief: AiDealBrief | null; leadId: string }) {
+export function AiBriefCard({ brief, leadId, canContract = true }: { brief: AiDealBrief | null; leadId: string; canContract?: boolean }) {
   const intel = hasIntelligence(brief) ? brief.intelligence : null;
   const process = intel?.process ?? null;
 
@@ -184,7 +184,7 @@ export function AiBriefCard({ brief, leadId }: { brief: AiDealBrief | null; lead
             )}
           </Section>
 
-          {intel.readiness && <ReadinessPanel readiness={intel.readiness} />}
+          {intel.readiness && <ReadinessPanel readiness={intel.readiness} canContract={canContract} />}
 
           {process && <ProcessPanel process={process} evaluator={intel.readiness?.evaluator} />}
         </CardContent>
@@ -231,7 +231,7 @@ function ChainStrip({ chain }: { chain: NonNullable<OpportunityIntelligence["cha
 
 /* --------------------------------------------------------------- readiness */
 
-function ReadinessPanel({ readiness }: { readiness: NonNullable<OpportunityIntelligence["readiness"]> }) {
+function ReadinessPanel({ readiness, canContract }: { readiness: NonNullable<OpportunityIntelligence["readiness"]>; canContract: boolean }) {
   return (
     <div className={cn("rounded-xl border p-4", readiness.ready ? "border-success/30 bg-success/5" : "border-border bg-muted/40")}>
       <div className="flex items-start justify-between gap-3">
@@ -261,8 +261,16 @@ function ReadinessPanel({ readiness }: { readiness: NonNullable<OpportunityIntel
           ))}
         </ul>
       )}
+      {/* The footnote has to match the role: pointing a Sales User at a button
+          they do not have would be the UI contradicting the permission. */}
       <p className="mt-2 text-[11px] text-muted-foreground">
-        The handoff is never automatic — it happens when you press <span className="font-medium text-foreground">{DOWNSTREAM.continueLabel}</span> in the header.
+        {canContract ? (
+          <>
+            The handoff is never automatic — it happens when you press <span className="font-medium text-foreground">{DOWNSTREAM.continueLabel}</span> in the header.
+          </>
+        ) : (
+          <>The handoff is never automatic — an admin performs it once qualification is complete.</>
+        )}
       </p>
     </div>
   );

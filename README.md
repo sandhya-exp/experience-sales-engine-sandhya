@@ -23,7 +23,7 @@ npm run db:setup                  # applies db/schema.sql, then seeds demo data
 npm run dev                       # http://localhost:3000
 ```
 
-Sign in as the demo sales user: **sandhya@experience.com** / **demo1234**
+Sign in as **sandhya@experience.com** / **demo1234** (Admin — the full lifecycle, including Ready to Contract), or as **priya@experience.com** / **demo1234** (Sales User — the lifecycle up to Scheduled Tasks).
 
 Re-run `npm run db:seed` at any time to reset to a clean demo state (5 companies across New / Contacted / Needs Attention / Quoted / Won).
 
@@ -77,7 +77,20 @@ The header's primary action is **Continue to Guided Selling →**: it verifies t
 
 Every lead has an **Owner**. New inquiries are routed automatically (`src/lib/routing.ts`): the team member who covers that industry gets it ("Assigned to Sandhya (Dental specialist)" on the timeline); if nobody covers it, whoever has the fewest open deals does. Any team member can hand a deal to anyone else from the **Owner** control in the lead header, with an optional reason ("covering while Sandhya is on leave") — the change is logged so coverage is always visible. The sidebar's **Team** section filters the pipeline to *My leads*, a colleague's book, or *Unassigned*.
 
-Demo team (all password `demo1234`): sandhya@, priya@, marcus@experience.com.
+Demo team (all password `demo1234`): sandhya@ (Admin), priya@ and marcus@experience.com (Sales User).
+
+## Roles and access
+
+Two roles, one boundary, held in `app_users.role`:
+
+| | Sales User | Admin |
+| --- | --- | --- |
+| Inquiries, pipeline, opportunity workspace, contacts, activity, qualification, AI Deal Brief, Scheduled Tasks | yes | yes |
+| Ready to Contract, the quote context review, the handoff, the contract module | no | yes |
+
+A Sales User owns the whole front half: they qualify the opportunity and the AI brief still tells them when qualification is complete — they simply do not perform the handover. Their nav ends at Scheduled Tasks, their Home has no contract card, and handoff to-dos do not appear on their list.
+
+The rule lives in one predicate (`canAccessContract`, `src/lib/roles.ts`) that both halves read, and it is **enforced on the server, not just in the UI** (`src/lib/authz.ts`): the pages redirect, the server actions refuse, the handoff and module-status APIs answer 403, and `src/proxy.ts` sits in front of the rewrites in `next.config.ts` so the contract module — its page, its bundle and its API — is never proxied to a Sales User's request. Typing the URL, replaying the action or curling the endpoint all get the same answer as the hidden button. The role is read from the database on each request, so changing someone's role takes effect immediately and no edited cookie can grant it.
 
 ## Talk to Sales and discovery-call booking
 

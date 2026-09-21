@@ -31,6 +31,7 @@ export function Sidebar({
   currentUserId,
   unassignedCount,
   taskCount,
+  canContract,
 }: {
   attentionCount: number;
   industries: IndustryCount[];
@@ -39,6 +40,8 @@ export function Sidebar({
   unassignedCount: number;
   /** Everything outstanding — the number on the Scheduled Tasks entry. */
   taskCount: number;
+  /** Admin only: the contract boundary. A Sales User's nav ends at Scheduled Tasks. */
+  canContract: boolean;
 }) {
   const pathname = usePathname();
   const sp = useSearchParams();
@@ -128,9 +131,11 @@ export function Sidebar({
             <NavItem href="/tasks" active={onTasks || onSchedule} icon={ListChecks} badge={taskCount > 0 ? taskCount : undefined}>
               Scheduled Tasks
             </NavItem>
-            <NavItem href={downstreamHref} active={onDownstream} icon={PackageCheck}>
-              {DOWNSTREAM.navLabel}
-            </NavItem>
+            {canContract && (
+              <NavItem href={downstreamHref} active={onDownstream} icon={PackageCheck}>
+                {DOWNSTREAM.navLabel}
+              </NavItem>
+            )}
           </ul>
         </div>
 

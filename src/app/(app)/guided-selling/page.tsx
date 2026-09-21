@@ -3,6 +3,7 @@ import { ExternalLink } from "lucide-react";
 import { listLeadRows } from "@/lib/repo/leads";
 import { headers } from "next/headers";
 import { getCurrentUser } from "@/lib/auth";
+import { requireContractAccess } from "@/lib/authz";
 import { getQuoteWorkspaceConfig, accountKeyFor, buildHandoffPayload, deliverHandoff } from "@/lib/handoff";
 import { DOWNSTREAM } from "@/lib/modules";
 import { quoteModuleStatus, moduleEmbedPath } from "@/lib/quote-module";
@@ -21,6 +22,8 @@ import { OpportunitySwitcher } from "@/components/workspace/opportunity-switcher
  * the line.
  */
 export default async function GuidedSellingPage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
+  // Admin only. The proxy refuses the module itself; this refuses the page.
+  await requireContractAccess();
   const sp = await searchParams;
   const selected = typeof sp.lead === "string" ? sp.lead : null;
   const rows = await listLeadRows();

@@ -5,6 +5,7 @@ import { getWorkspaceData } from "@/lib/repo/workspace";
 import { getQuoteWorkspaceConfig, buildHandoffPayload } from "@/lib/handoff";
 import { headers } from "next/headers";
 import { getCurrentUser } from "@/lib/auth";
+import { hasContractAccess } from "@/lib/authz";
 import { DOWNSTREAM } from "@/lib/modules";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Card, CardContent } from "@/components/ui/card";
@@ -15,6 +16,8 @@ import { QuoteHandoffConfirm } from "@/components/workspace/quote-handoff-confir
 // that sends it (see src/lib/handoff.ts and docs/QUOTE_HANDOFF.md).
 export default async function QuoteHandoffPage({ params }: PageProps<"/leads/[id]/quote">) {
   const { id } = await params;
+  // Admin only — the quote context review is the handoff itself.
+  if (!(await hasContractAccess())) redirect(`/leads/${id}`);
   const data = await getWorkspaceData(id);
   if (!data) notFound();
   const { lead, company, contacts } = data;

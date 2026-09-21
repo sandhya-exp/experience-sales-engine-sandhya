@@ -1,4 +1,5 @@
 import type { OpportunityInsight } from "@/lib/insights";
+import { canAccessContract, type Role } from "@/lib/roles";
 import type { ScheduledItem } from "@/lib/repo/schedule";
 
 /**
@@ -176,4 +177,14 @@ export function buildTasks(insights: OpportunityInsight[], upcoming: ScheduledIt
   }
 
   return tasks.sort((a, b) => a.priority - b.priority || (a.due ?? "").localeCompare(b.due ?? ""));
+}
+
+/**
+ * The same list, filtered to what the role may act on. A Sales User never sees
+ * "continue to the quote" tasks: the handoff is not theirs to perform, and a
+ * to-do you are not allowed to do is worse than no to-do at all.
+ */
+export function tasksForRole(tasks: SalesTask[], role: Role): SalesTask[] {
+  if (canAccessContract(role)) return tasks;
+  return tasks.filter((t) => t.kind !== "quote_handoff");
 }

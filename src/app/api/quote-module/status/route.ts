@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth";
+import { canAccessContract } from "@/lib/roles";
 import { quoteModuleStatus } from "@/lib/quote-module";
 
 export const dynamic = "force-dynamic";
@@ -18,5 +19,6 @@ export const dynamic = "force-dynamic";
 export async function GET() {
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+  if (!canAccessContract(user.role)) return NextResponse.json({ error: "forbidden" }, { status: 403 });
   return NextResponse.json(await quoteModuleStatus());
 }

@@ -9,11 +9,12 @@ import { LEAD_STATUSES } from "@/lib/types";
 import type { LeadStatus } from "@/lib/types";
 import { needsAttention } from "@/lib/dashboard";
 import { buildInsights, bucketInsights } from "@/lib/insights";
-import { buildTasks } from "@/lib/tasks";
+import { buildTasks, tasksForRole } from "@/lib/tasks";
 import { StatsStrip } from "@/components/dashboard/stats-strip";
 import { NeedsAttentionPanel } from "@/components/dashboard/side-panels";
 import { AiInsightsPanel, MeetingsPanel, NextActionsPanel, QuoteReadyPanel, RecentActivitySummary, TasksPanel } from "@/components/dashboard/home-cards";
 import { getCurrentUser } from "@/lib/auth";
+import { canAccessContract } from "@/lib/roles";
 
 /**
  * Sales Engine Home — the workspace a salesperson opens first.
@@ -38,7 +39,10 @@ export default async function HomePage() {
   const firstName = user?.name.split(" ")[0];
   const insights = buildInsights(rows, briefs);
   const buckets = bucketInsights(insights);
-  const tasks = buildTasks(insights, upcoming, overdue);
+  // A Sales User's Home ends where their product ends: no contract-boundary
+  // card, no ready-to-hand-over stat, no handoff tasks.
+  const canContract = canAccessContract(user?.role);
+  const tasks = tasksForRole(buildTasks(insights, upcoming, overdue), user?.role ?? "sales");
 
   const counts = LEAD_STATUSES.reduce(
     (acc, status) => {
@@ -84,9 +88,9 @@ export default async function HomePage() {
       <div className="mt-6 grid items-start gap-4 lg:grid-cols-2">
         <TasksPanel tasks={tasks} />
         <MeetingsPanel meetings={upcoming} status={calendar} />
-        <AiInsightsPanel buckets={buckets} />
+        <AiInsightsPanel buckets={buckets} canContract={canContract} />
         <NextActionsPanel buckets={buckets} />
-        <QuoteReadyPanel buckets={buckets} />
+        {canContract && <QuoteReadyPanel buckets={buckets} />}
         <RecentActivitySummary activities={recent} />
       </div>
 

@@ -7,6 +7,7 @@ import { DOWNSTREAM } from "@/lib/modules";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import { getCurrentUser } from "@/lib/auth";
+import { assertContractAccess } from "@/lib/authz";
 import { recordActivity } from "@/lib/repo/activities";
 import {
   updateQualification as updateQualificationRepo,
@@ -98,6 +99,9 @@ export interface HandoffResult {
  * timeline. Returns where the user should be taken next.
  */
 export async function createQuoteHandoffAction(leadId: string): Promise<HandoffResult> {
+  // Admin only, checked here rather than only at the button: a server action is
+  // a POST to this route, so hiding the control is not a guard.
+  if (!(await assertContractAccess())) throw new Error("Not authorised to hand this opportunity to Contract.");
   const name = await actorName();
   const h = await headers();
   const origin = `${h.get("x-forwarded-proto") ?? "http"}://${h.get("x-forwarded-host") ?? h.get("host") ?? "localhost:3000"}`;
@@ -236,6 +240,7 @@ export type PrepareResult = { ok: true } | { ok: false; missing: string[] };
  * (which pushes the structured context into Quote Ready).
  */
 export async function prepareGuidedSellingAction(leadId: string): Promise<PrepareResult> {
+  if (!(await assertContractAccess())) throw new Error("Not authorised to prepare this opportunity for Contract.");
   const { computeReadiness } = await import("@/lib/readiness");
   let ctx = await getLeadContextOrThrow(leadId);
   const readiness = computeReadiness(ctx.lead, ctx.contacts);

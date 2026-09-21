@@ -6,7 +6,7 @@ import { listOverdueMeetings, listUpcomingMeetings } from "@/lib/repo/schedule";
 import { calendarStatus } from "@/lib/calendar/status";
 import { getCurrentUser } from "@/lib/auth";
 import { buildInsights } from "@/lib/insights";
-import { buildTasks, TASK_KIND_LABELS, type SalesTask, type TaskKind } from "@/lib/tasks";
+import { buildTasks, tasksForRole, TASK_KIND_LABELS, type SalesTask, type TaskKind } from "@/lib/tasks";
 import { TaskRow, CalendarBadge } from "@/components/dashboard/home-cards";
 import { cn } from "@/lib/utils";
 
@@ -37,7 +37,8 @@ export default async function ScheduledTasksPage({ searchParams }: PageProps<"/t
     calendarStatus(),
   ]);
 
-  const all = buildTasks(buildInsights(rows, briefs), upcoming, overdue);
+  // Handoff tasks belong to the role that can perform the handoff.
+  const all = tasksForRole(buildTasks(buildInsights(rows, briefs), upcoming, overdue), user?.role ?? "sales");
   const byOwner = mineOnly && user ? all.filter((t) => t.ownerName === user.name) : all;
   const tasks = kind === "all" ? byOwner : byOwner.filter((t) => t.kind === kind);
 

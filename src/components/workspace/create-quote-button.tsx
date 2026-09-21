@@ -22,11 +22,14 @@ export function CreateQuoteButton({
   status,
   complete,
   focusField,
+  canContract,
 }: {
   leadId: string;
   status: LeadStatus;
   complete: boolean;
   focusField: QualField | null;
+  /** Admin only. A Sales User still completes qualification — they just don't hand over. */
+  canContract: boolean;
 }) {
   const router = useRouter();
   const [pending, start] = useTransition();
@@ -46,6 +49,10 @@ export function CreateQuoteButton({
       </Button>
     );
   }
+
+  // Qualified, but the handoff is not this role's step. The opportunity is
+  // complete and visible; the boundary is simply not theirs to cross.
+  if (!canContract) return null;
 
   return (
     <div className="flex flex-col items-end gap-1">

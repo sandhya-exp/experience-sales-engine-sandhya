@@ -227,12 +227,17 @@ export function CalendarBadge({ status, className }: { status: CalendarStatus; c
 
 /* ------------------------------------------------------------ ai insights */
 
-export function AiInsightsPanel({ buckets }: { buckets: InsightBuckets }) {
+export function AiInsightsPanel({ buckets, canContract = true }: { buckets: InsightBuckets; canContract?: boolean }) {
   const stats: { key: string; label: string; count: number; href: string; tone: "warn" | "ok" | "neutral" }[] = [
     { key: "attention", label: "Need attention", count: buckets.attention.length, href: "/pipeline?stage=attention", tone: "warn" },
     { key: "missing", label: "Missing qualification info", count: buckets.missingInfo.length, href: "/tasks?kind=qualification_gap", tone: "warn" },
     { key: "conflict", label: "Contradictions detected", count: buckets.contradictions.length, href: "/tasks?kind=qualification_gap", tone: "warn" },
-    { key: "ready", label: `Ready for ${DOWNSTREAM.name}`, count: buckets.ready.length, href: DOWNSTREAM.route, tone: "ok" },
+    // The readiness stat links into the contract boundary, so it is Admin-only;
+    // a Sales User gets the qualified count in its place, which is the same
+    // opportunities read from their side of the line.
+    canContract
+      ? { key: "ready", label: `Ready for ${DOWNSTREAM.name}`, count: buckets.ready.length, href: DOWNSTREAM.route, tone: "ok" as const }
+      : { key: "ready", label: "Fully qualified", count: buckets.ready.length, href: "/pipeline?stage=qualified", tone: "ok" as const },
   ];
   const conflict = buckets.contradictions[0];
   const gap = buckets.missingInfo[0];

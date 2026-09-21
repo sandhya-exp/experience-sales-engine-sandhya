@@ -9,6 +9,7 @@ import { QualificationTab } from "@/components/workspace/qualification-tab";
 import { AiBriefTab } from "@/components/workspace/ai-brief-tab";
 import { nextFollowUpFor } from "@/lib/repo/followups";
 import { listTeam } from "@/lib/repo/users";
+import { hasContractAccess } from "@/lib/authz";
 import { hasIntelligence } from "@/components/workspace/ai-brief-card";
 
 export default async function LeadWorkspacePage({ params, searchParams }: PageProps<"/leads/[id]">) {
@@ -21,7 +22,7 @@ export default async function LeadWorkspacePage({ params, searchParams }: PagePr
   if (!data) notFound();
 
   const { lead, company, contacts, activities, brief, ownerName } = data;
-  const [followUp, team] = await Promise.all([nextFollowUpFor(lead.id), listTeam()]);
+  const [followUp, team, canContract] = await Promise.all([nextFollowUpFor(lead.id), listTeam(), hasContractAccess()]);
   const focusField = hasIntelligence(brief) ? (brief.intelligence.next_action.field ?? brief.intelligence.gaps.missing.find((m) => m.field)?.field ?? null) : null;
 
   return (
@@ -34,6 +35,7 @@ export default async function LeadWorkspacePage({ params, searchParams }: PagePr
         team={team}
         contacts={contacts}
         focusField={focusField}
+        canContract={canContract}
       />
       <div className="mx-auto max-w-6xl px-6 py-6">
         <WorkspaceTabs
@@ -42,7 +44,7 @@ export default async function LeadWorkspacePage({ params, searchParams }: PagePr
           contacts={<ContactsTab leadId={lead.id} companyId={company.id} contacts={contacts} />}
           activity={<ActivityTab leadId={lead.id} activities={activities} />}
           qualification={<QualificationTab lead={lead} contacts={contacts} focus={focus} />}
-          brief={<AiBriefTab leadId={lead.id} brief={brief} />}
+          brief={<AiBriefTab leadId={lead.id} brief={brief} canContract={canContract} />}
         />
       </div>
     </div>

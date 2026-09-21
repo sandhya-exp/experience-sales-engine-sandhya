@@ -11,6 +11,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { logout } from "@/app/actions/auth";
 import type { SessionUser } from "@/lib/auth";
+import { ROLE_LABELS } from "@/lib/roles";
 
 export function UserMenu({ user }: { user: SessionUser }) {
   const initials = user.name
@@ -31,6 +32,10 @@ export function UserMenu({ user }: { user: SessionUser }) {
         <DropdownMenuLabel>
           {user.name}
           <div className="text-xs font-normal text-muted-foreground">{user.email}</div>
+          {/* Which access you are signed in with — the one thing that changes what this workspace shows. */}
+          <div className="mt-1 inline-flex rounded-full bg-muted px-2 py-0.5 text-[11px] font-medium text-muted-foreground">
+            {ROLE_LABELS[user.role]}
+          </div>
         </DropdownMenuLabel>
         <DropdownMenuSeparator />
         <DropdownMenuItem onSelect={() => logout()}>Sign out</DropdownMenuItem>

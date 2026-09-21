@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { headers } from "next/headers";
 import { getCurrentUser } from "@/lib/auth";
+import { canAccessContract } from "@/lib/roles";
 import { buildHandoffPayload } from "@/lib/handoff";
 
 /**
@@ -20,6 +21,9 @@ export async function GET(_req: Request, ctx: RouteContext<"/api/handoff/[leadId
   const user = keyOk ? null : await getCurrentUser();
   if (!keyOk && !user) {
     return NextResponse.json({ error: "unauthorised" }, { status: 401, headers: cors() });
+  }
+  if (!keyOk && !canAccessContract(user?.role)) {
+    return NextResponse.json({ error: "forbidden" }, { status: 403, headers: cors() });
   }
 
   const origin = originFrom(h);

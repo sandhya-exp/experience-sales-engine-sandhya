@@ -2,17 +2,27 @@ import type { OpportunityInsight } from "@/lib/insights";
 import type { ScheduledItem } from "@/lib/repo/schedule";
 
 /**
- * Tasks & follow-ups.
+ * Scheduled Tasks — one list of everything on a salesperson's plate.
  *
- * A "task" here is not a new record — there is no tasks table and there
- * shouldn't be one. Every task is derived from something that already exists on
- * an opportunity: a booked call whose time has passed, a call happening today,
- * an opportunity nobody owns, a qualification gap the AI found, or the AI's
- * recommended next action. That way the list can never drift from the pipeline,
- * and doing the work (logging the call, filling the gap) clears the task on its
- * own.
+ * Booked meetings and calls sit here alongside the things with no time on them
+ * (an unowned opportunity, a qualification gap, the AI's next action), because
+ * the question someone asks when they log in is "what do I have to do", not
+ * "what is in my calendar" and separately "what is on my list".
+ *
+ * None of it is a new record — there is no tasks table and there shouldn't be
+ * one. Every item is derived from something that already exists on an
+ * opportunity: a booked call, one whose time has passed, an opportunity nobody
+ * owns, a gap the AI found, its recommended next action. So the list can never
+ * drift from the pipeline, and doing the work clears the item on its own.
  */
-export type TaskKind = "missed_call" | "call_today" | "unassigned" | "qualification_gap" | "ai_next_action" | "quote_handoff";
+export type TaskKind =
+  | "missed_call"
+  | "call_today"
+  | "call_upcoming"
+  | "unassigned"
+  | "qualification_gap"
+  | "ai_next_action"
+  | "quote_handoff";
 
 export interface SalesTask {
   id: string;
@@ -33,7 +43,8 @@ export interface SalesTask {
 
 export const TASK_KIND_LABELS: Record<TaskKind, string> = {
   missed_call: "Missed call",
-  call_today: "Call today",
+  call_today: "Today",
+  call_upcoming: "Meeting",
   unassigned: "Unassigned",
   qualification_gap: "Qualification gap",
   ai_next_action: "AI next action",
@@ -59,6 +70,22 @@ export function buildTasks(insights: OpportunityInsight[], upcoming: ScheduledIt
       due: m.scheduledFor,
       overdue: true,
       priority: 0,
+      href: `/leads/${m.leadId}`,
+    });
+  }
+
+  for (const m of upcoming.filter((u) => !isToday(u.scheduledFor))) {
+    tasks.push({
+      id: `meeting:${m.activityId}`,
+      kind: "call_upcoming",
+      title: `${m.title} with ${m.companyName}`,
+      reason: `${new Date(m.scheduledFor).toLocaleString("en-US", { weekday: "long", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}${m.contactName ? ` · ${m.contactName}` : ""}${m.calendar?.rep_name ? ` · ${m.calendar.rep_name}` : ""}`,
+      leadId: m.leadId,
+      companyName: m.companyName,
+      ownerName: m.ownerName,
+      due: m.scheduledFor,
+      overdue: false,
+      priority: 2,
       href: `/leads/${m.leadId}`,
     });
   }
@@ -91,7 +118,7 @@ export function buildTasks(insights: OpportunityInsight[], upcoming: ScheduledIt
         ownerName: null,
         due: null,
         overdue: false,
-        priority: 2,
+        priority: 3,
         href: `/leads/${i.lead.id}`,
       });
     }
@@ -107,7 +134,7 @@ export function buildTasks(insights: OpportunityInsight[], upcoming: ScheduledIt
         ownerName: i.lead.owner_name,
         due: null,
         overdue: false,
-        priority: 3,
+        priority: 4,
         href: `/leads/${i.lead.id}/quote`,
       });
       continue;
@@ -125,7 +152,7 @@ export function buildTasks(insights: OpportunityInsight[], upcoming: ScheduledIt
         ownerName: i.lead.owner_name,
         due: null,
         overdue: false,
-        priority: 4,
+        priority: 5,
         href: `/leads/${i.lead.id}`,
       });
       continue;
@@ -142,7 +169,7 @@ export function buildTasks(insights: OpportunityInsight[], upcoming: ScheduledIt
         ownerName: i.lead.owner_name,
         due: null,
         overdue: false,
-        priority: 5,
+        priority: 6,
         href: `/leads/${i.lead.id}`,
       });
     }

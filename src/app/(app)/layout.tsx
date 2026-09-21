@@ -46,7 +46,6 @@ export default async function AppLayout({ children }: LayoutProps<"/">) {
           currentUserId={user.id}
           unassignedCount={unassigned}
           taskCount={taskCount}
-          meetingCount={upcoming.length}
         />
       </Suspense>
       <div className="flex min-w-0 flex-1 flex-col">

@@ -89,6 +89,7 @@ function EmptyLine({ children }: { children: React.ReactNode }) {
 const TASK_ICON: Record<TaskKind, React.ComponentType<{ className?: string }>> = {
   missed_call: CircleAlert,
   call_today: Clock,
+  call_upcoming: Video,
   unassigned: UserPlus,
   qualification_gap: ListChecks,
   ai_next_action: Sparkles,
@@ -100,11 +101,11 @@ export function TasksPanel({ tasks, limit = 5 }: { tasks: SalesTask[]; limit?: n
   const overdue = tasks.filter((t) => t.overdue).length;
   return (
     <Panel
-      label="Tasks & follow-ups"
+      label="Scheduled Tasks"
       title={tasks.length === 0 ? "Nothing waiting on you" : `${tasks.length} action${tasks.length === 1 ? "" : "s"} to take`}
       question="What happens next, and who owns it?"
       icon={ListChecks}
-      action={tasks.length > shown.length ? { href: "/tasks", label: "All tasks" } : { href: "/tasks", label: "Open" }}
+      action={{ href: "/tasks", label: tasks.length > shown.length ? "See all" : "Open" }}
     >
       {overdue > 0 && (
         <p className="mb-2 inline-flex items-center gap-1.5 rounded-md bg-warning/10 px-2 py-1 text-[12px] font-medium text-warning">
@@ -160,7 +161,7 @@ export function MeetingsPanel({ meetings, status, limit = 4 }: { meetings: Sched
       title={meetings.length === 0 ? "No calls booked" : `${meetings.length} call${meetings.length === 1 ? "" : "s"} coming up`}
       question="What meetings are coming, and with whom?"
       icon={CalendarDays}
-      action={{ href: "/schedule", label: "Schedule" }}
+      action={{ href: "/tasks", label: "Scheduled Tasks" }}
     >
       <CalendarBadge status={status} />
       {shown.length === 0 && <p className="py-3 text-[13px] text-muted-foreground">Customers book discovery calls from Talk to Sales; reps can schedule one from any opportunity.</p>}

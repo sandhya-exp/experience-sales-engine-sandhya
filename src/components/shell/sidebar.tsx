@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useState } from "react";
-import { AlertTriangle, KanbanSquare, Inbox, CalendarDays, Building2, Home, Users, PackageCheck, ListChecks, CalendarClock } from "lucide-react";
+import { AlertTriangle, KanbanSquare, Inbox, CalendarDays, Building2, Home, Users, PackageCheck, ListChecks } from "lucide-react";
 import { DOWNSTREAM } from "@/lib/modules";
 import type { TeamMember } from "@/lib/repo/users";
 import { ExperienceLogo } from "@/components/brand/logo";
@@ -31,17 +31,14 @@ export function Sidebar({
   currentUserId,
   unassignedCount,
   taskCount,
-  meetingCount,
 }: {
   attentionCount: number;
   industries: IndustryCount[];
   team: TeamMember[];
   currentUserId: string;
   unassignedCount: number;
-  /** Open tasks & follow-ups — the number on the Tasks entry. */
+  /** Everything outstanding — the number on the Scheduled Tasks entry. */
   taskCount: number;
-  /** Discovery calls still ahead of us — the number on the Schedule entry. */
-  meetingCount: number;
 }) {
   const pathname = usePathname();
   const router = useRouter();
@@ -55,7 +52,6 @@ export function Sidebar({
   const onHome = pathname === "/";
   const onPipeline = pathname === "/pipeline";
   const onActivity = pathname === "/activity";
-  const onCompanies = pathname.startsWith("/companies");
   const onTasks = pathname.startsWith("/tasks");
   const onSchedule = pathname.startsWith("/schedule");
   const onDownstream = pathname === DOWNSTREAM.route;
@@ -119,22 +115,19 @@ export function Sidebar({
             >
               Needs attention
             </NavItem>
-            <NavItem href="/companies" active={onCompanies} icon={Building2}>
-              Companies
-            </NavItem>
           </ul>
         </div>
 
-        {/* Follow-through — what has to happen next, and when. Recent activity
-            ("what happened") is a header action instead, next to New Lead. */}
+        {/* Follow-through — what has to happen next, and when. Scheduled Tasks
+            carries meetings, calls and to-dos in one list; the Schedule page
+            (calendar settings, booking history) and Companies are still there,
+            linked from the pages that need them rather than from the nav.
+            Recent activity is a header action, next to New Lead. */}
         <div>
           <p className="section-label px-3 pb-2">Follow-through</p>
           <ul className="space-y-0.5">
-            <NavItem href="/tasks" active={onTasks} icon={ListChecks} badge={taskCount > 0 ? taskCount : undefined}>
-              Tasks
-            </NavItem>
-            <NavItem href="/schedule" active={onSchedule} icon={CalendarClock} badge={meetingCount > 0 ? meetingCount : undefined}>
-              Schedule
+            <NavItem href="/tasks" active={onTasks || onSchedule} icon={ListChecks} badge={taskCount > 0 ? taskCount : undefined}>
+              Scheduled Tasks
             </NavItem>
             <NavItem href={downstreamHref} active={onDownstream} icon={PackageCheck}>
               {DOWNSTREAM.navLabel}

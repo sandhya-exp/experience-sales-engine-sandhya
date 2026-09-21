@@ -1,0 +1,107 @@
+@import "tailwindcss";
+@plugin "tailwindcss-animate";
+
+@custom-variant dark (&:is(.dark *));
+
+:root {
+  --background: #f3f6fc;
+  --foreground: #172246;
+
+  --card: #ffffff;
+  --card-foreground: #0f1729;
+
+  --popover: #ffffff;
+  --popover-foreground: #0f1729;
+
+  --primary: #1d4ed8;
+  --primary-foreground: #ffffff;
+
+  --secondary: #eef1f6;
+  --secondary-foreground: #101a33;
+
+  --muted: #f1f4fa;
+  --muted-foreground: #64708a;
+
+  --accent: #eaf0ff;
+  --accent-foreground: #1d4ed8;
+
+  --destructive: #dc2626;
+  --destructive-foreground: #ffffff;
+
+  --success: #16a34a;
+  --success-foreground: #ffffff;
+
+  --warning: #d97706;
+  --warning-foreground: #ffffff;
+
+  --border: #e3e8f2;
+  --input: #dfe5f0;
+  --ring: #1d4ed8;
+
+  --navy: #1f2f55;
+  --navy-light: #2c3f6e;
+  --navy-foreground: #ffffff;
+
+  --radius: 0.875rem;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-success: var(--success);
+  --color-success-foreground: var(--success-foreground);
+  --color-warning: var(--warning);
+  --color-warning-foreground: var(--warning-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-navy: var(--navy);
+  --color-navy-light: var(--navy-light);
+  --color-navy-foreground: var(--navy-foreground);
+
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+
+  --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-mono: ui-monospace, "SF Mono", "Cascadia Code", "Roboto Mono", Menlo, Consolas, monospace;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-sans);
+}
+
+.card-shadow {
+  box-shadow: 0 1px 2px 0 rgb(23 34 70 / 0.04), 0 2px 8px -2px rgb(23 34 70 / 0.06);
+}
+
+/* Small uppercase, letter-spaced section label — the shared Sales Engine
+   pattern for "ACCOUNT STRUCTURE", "NEEDS ATTENTION", "RECENT ACTIVITY". */
+.section-label {
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted-foreground);
+}

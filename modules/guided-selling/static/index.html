@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Experience.com · Contract to Renewal</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="/static/css/styles.css" />
+  </head>
+  <body>
+    <div class="app">
+      <aside class="rail">
+        <div class="brand">
+          <div class="mark">E</div>
+          <div>
+            <div class="brand-name">Experience.com</div>
+            <div class="brand-sub">Sales Engine · Close &amp; Renew</div>
+          </div>
+        </div>
+
+        <div class="accounts">
+          <div class="label">Accounts</div>
+          <div id="accountList" class="account-list"></div>
+        </div>
+
+        <nav class="nav">
+          <button class="nav-item is-active" data-view="handoff">Lead handoff</button>
+          <button class="nav-item" data-view="customer">Customer 360</button>
+          <button class="nav-item" data-view="contract">Contract</button>
+          <button class="nav-item" data-view="signing">Document signing</button>
+          <button class="nav-item" data-view="documents">Documents</button>
+          <button class="nav-item" data-view="renewal">Renewal copilot</button>
+        </nav>
+
+        <div class="handoff">
+          <div class="label">Handoff from Lead team</div>
+          <p>Qualified deals arrive from Encompass, BytePro, Total Expert, and AgencyZoom. Accept a payload to create Customer 360 — this workspace never originates the inquiry.</p>
+        </div>
+
+        <div class="clock">
+          <div class="label">Demo clock</div>
+          <div class="clock-date" id="clockDate">18 Sep 2026</div>
+          <p class="clock-hint">Jump forward to show the 30-day renewal window on the same customer — not a duplicate account.</p>
+          <div class="clock-actions">
+            <button id="clockNow" class="ghost">Contract start</button>
+            <button id="clockRenewal" class="warn">11 months later</button>
+          </div>
+        </div>
+      </aside>
+
+      <main class="stage">
+        <header class="topbar">
+          <div>
+            <div class="crumb">Platform · FastAPI · Quote to Renewal</div>
+            <h1 id="pageTitle">ABC Corp</h1>
+          </div>
+          <div class="top-meta">
+            <span class="pill source" id="sourcePill">Qualified · Total Expert</span>
+            <span class="pill quote" id="quotePill">Quote ₹4,80,000 / year</span>
+          </div>
+        </header>
+
+        <div id="renewalBanner" class="renewal-banner hidden"></div>
+        <div id="viewRoot"></div>
+      </main>
+    </div>
+
+    <div
+      id="renewalModal"
+      class="modal hidden"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="renewalModalTitle"
+    >
+      <div class="modal-backdrop" data-dismiss></div>
+      <div class="modal-card" id="renewalModalCard"></div>
+    </div>
+    <script src="/static/js/app.js"></script>
+  </body>
+</html>

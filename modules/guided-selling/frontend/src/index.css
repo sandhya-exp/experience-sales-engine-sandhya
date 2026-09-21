@@ -1,0 +1,39 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 220 40% 96%;
+    --foreground: 215 50% 25%;
+    --card: 0 0% 100%;
+    --card-foreground: 215 50% 25%;
+    --primary: 217 91% 50%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 220 40% 96%;
+    --secondary-foreground: 215 50% 25%;
+    --muted: 220 40% 96%;
+    --muted-foreground: 215 30% 46%;
+    --accent: 217 91% 50%;
+    --accent-foreground: 0 0% 100%;
+    --destructive: 350 89% 60%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 220 30% 90%;
+    --radius: 0.75rem;
+  }
+
+  * { @apply border-border; }
+  body {
+    @apply m-0 bg-background text-foreground antialiased;
+    font-family: Inter, ui-sans-serif, system-ui, -apple-system, sans-serif;
+  }
+  button { font-family: inherit; }
+}
+
+@layer utilities {
+  .voce-sidebar {
+    background:
+      radial-gradient(circle at 85% 12%, rgba(43, 103, 243, 0.45), transparent 55%),
+      linear-gradient(135deg, #0d2463 0%, #183b8b 55%, #2b67f3 140%);
+  }
+}

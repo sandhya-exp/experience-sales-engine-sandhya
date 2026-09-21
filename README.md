@@ -1,0 +1,122 @@
+# Experience Sales Engine — Lead & Deal Workspace
+
+The front half of the Experience.com Sales Engine lifecycle, built as a real working application:
+
+**Customer Inquiry → Opportunity → Qualification → AI Opportunity Intelligence → Quote Context → Continue to Guided Selling**
+
+Two experiences in one app:
+
+- **Customer-facing lead intake** at `/inquire` — a prospect submits company, contact, users, interest and requirements; a lead is created instantly.
+- **Internal Sales Engine workspace** at `/` (login required) — pipeline dashboard with stage counts, Needs Attention and Recent Activity; a per-lead workspace with Company info, Contacts, Activity timeline, Qualification, AI Opportunity Intelligence and Quote Readiness; and a **Continue to Guided Selling** step that hands the quote context to the Guided Selling module (Quote → Approval → Contract → E-signature → Renewal) on the same customer.
+
+Stack: Next.js 16 (App Router) · React 19 · TypeScript · Tailwind CSS v4 · shadcn/ui-style components on Radix · PostgreSQL (Supabase-compatible).
+
+## Run it locally
+
+Prerequisites: Node 20+, and PostgreSQL running locally (Postgres.app or `brew install postgresql@16` both work). Or point `DATABASE_URL` at a Supabase project instead — nothing in the code is Supabase-specific.
+
+```bash
+npm install
+cp .env.example .env.local        # edit DATABASE_URL if your Postgres isn't postgres:postgres@localhost:5432
+createdb sales_engine             # once
+npm run db:setup                  # applies db/schema.sql, then seeds demo data
+npm run dev                       # http://localhost:3000
+```
+
+Sign in as the demo sales user: **sandhya@experience.com** / **demo1234**
+
+Re-run `npm run db:seed` at any time to reset to a clean demo state (5 companies across New / Contacted / Needs Attention / Quoted / Won).
+
+## Suggested demo path
+
+1. Open `/inquire` and submit an inquiry as a customer.
+2. Sign in at `/login` — the new lead is at the top of the pipeline with an AI-suggested next action.
+3. Open it: log a call or note, fill in Qualification and set status to Qualified — the stage advances and **Continue to Guided Selling** lights up.
+4. Watch **AI Opportunity Intelligence** and **Quote Readiness** update as qualification fills in; then **Continue to Guided Selling →**.
+5. The Quote Context screen shows exactly what Guided Selling receives; continuing moves the opportunity to Guided Selling, logs it on the timeline and opens the module on the same customer.
+
+## AI Opportunity Intelligence
+
+The AI layer turns an unstructured customer inquiry into a grounded, validated, quote-ready opportunity. It is a small, bounded workflow (`src/lib/ai/orchestrator.ts`), not a chatbot and not a swarm of agents:
+
+```
+tools (read-only) ─► deterministic extraction (source of truth) ─► retrieval from the Sales Knowledge Base
+      ─► 1. Opportunity Analyst   (Claude · grounded in the record, every claim cites a source)
+      ─► 2. Solution Context      (Claude · grounded in the retrieved documents, every item cites a doc id)
+      ─► 3. Readiness / Evaluator (deterministic guardrail + Claude review)
+      ─► Opportunity Intelligence, saved on the lead ─► salesperson reviews ─► Continue to Guided Selling →
+```
+
+- **Tools** (`src/lib/ai/tools.ts`): `get_opportunity`, `get_contacts`, `get_activities`, `get_qualification`, `search_knowledge`. Every call is traced and shown in the UI. All read-only — the AI never changes a stage, a qualification field or triggers the handoff; those stay behind the buttons a person clicks.
+- **Sales Knowledge Base** (`src/lib/ai/knowledge/`): capability areas, integrations by industry, qualification guidance and quote-preparation rules, retrieved with a small explainable lexical retriever (`retrieval.ts`) so the AI can say *customer requires X → retrieved capability Y → consider Z in Guided Selling*. No pricing, packages or tiers anywhere in it.
+- **Deterministic layer** (`intelligence.ts`, `readiness.ts`) decides the facts: extracted deployment/integrations, qualification gaps, quote context, readiness, and **contradictions** between the inquiry and qualification (user count, primary need, decision maker). Claude interprets and explains; it cannot add facts.
+- **Evaluator** removes anything that cites a source not on the record, cites a knowledge document that was not retrieved, contains a figure that appears nowhere in the record, or uses pricing/package language — and shows what it removed and why. Readiness for Guided Selling is a ✓/⚠ checklist, never a vibe.
+- **One-look chain**: every brief opens with "How the AI got here" — *Customer says → Knowledge retrieved → AI identifies → Gap (with the question to ask) → Guided Selling readiness → Next action*. The seeded **Meridian Home Loans** lead ("connect our loan origination system so 1,200 loan officers across 85 branches get a review request at closing") walks it end to end: *Mortgage & real-estate systems* and *Reputation Management* documents retrieved → LOS integration required, 1,200 users and 85 branches confirmed → gap "Which loan origination system are you using — Encompass, or another LOS?" → Not ready → "Confirm which loan origination system (LOS) Elena Ruiz uses before Guided Selling".
+- **Output**: Customer Need · Evidence (sources used) · Relevant Product Context · Qualification Gaps (each with the question to ask) · AI check (potential conflicts) · Recommended Next Action · Quote Context · Guided Selling Readiness, plus an expandable **AI process & evidence** panel with stages, tool calls, retrieved documents, record sources and the evaluator's conclusion. Process metadata only — never chain-of-thought.
+- **Mode indicator**: the card is labelled **Claude · <model>** or **Deterministic**. With `ANTHROPIC_API_KEY` set the Claude stages run server-side; without it, or if the API fails or returns invalid JSON, each stage falls back to its deterministic result and says so.
+- **Evals**: `npm run eval:ai` runs nine realistic opportunities (new, qualified, vague, conflicting, won, adversarial pricing request, enterprise HRIS chain, mortgage LOS chain…) and fails on any invented figure, pricing language, unresolvable citation, missed gap, missed contradiction or wrong readiness. `npm run eval:ai -- --claude` also runs them through Claude.
+
+The header's primary action is **Continue to Guided Selling →**: it verifies the minimum context, refreshes the intelligence so the Quote Context is final, marks the opportunity **Quote Ready** on the timeline (auto-advancing New/Contacted to Qualified), and continues to the Quote Context screen which pushes the context into Guided Selling. When information is missing the button becomes **Complete Qualification →** and jumps to the exact missing field. After pulling this change run `npm run db:schema` once (adds the `intelligence` column; idempotent).
+
+## Where things live
+
+| Area | Path |
+|---|---|
+| Schema | `db/schema.sql` — `companies`, `contacts`, `leads`, `activities`, `ai_deal_briefs`, `app_users` |
+| Seed data | `db/seed.ts` |
+| Data access | `src/lib/db.ts` (one Postgres boundary) and `src/lib/repo/*` |
+| Server actions | `src/app/actions/*.ts` |
+| Customer intake | `src/app/inquire/` |
+| Dashboard | `src/app/(app)/page.tsx`, `src/components/dashboard/` |
+| Lead workspace | `src/app/(app)/leads/[id]/`, `src/components/workspace/` |
+| Quote handoff | `src/app/(app)/leads/[id]/quote/page.tsx` |
+| AI workflow | `src/lib/ai/` — `orchestrator.ts`, `tools.ts`, `claude.ts`, `knowledge/`, `intelligence.ts`; evals in `evals/ai-intelligence/` |
+
+## Team, ownership and coverage
+
+Every lead has an **Owner**. New inquiries are routed automatically (`src/lib/routing.ts`): the team member who covers that industry gets it ("Assigned to Sandhya (Dental specialist)" on the timeline); if nobody covers it, whoever has the fewest open deals does. Any team member can hand a deal to anyone else from the **Owner** control in the lead header, with an optional reason ("covering while Sandhya is on leave") — the change is logged so coverage is always visible. The sidebar's **Team** section filters the pipeline to *My leads*, a colleague's book, or *Unassigned*.
+
+Demo team (all password `demo1234`): sandhya@, priya@, marcus@experience.com.
+
+## Booked follow-ups
+
+A prospect can pick a 30-minute discovery-call slot right after submitting the inquiry (`/inquire/thank-you`); a rep can **Schedule** one from the lead header or Activity tab. A booking is a `call` activity with `metadata.kind = "follow_up"` — no new table. It shows as a chip in the lead header, a line in the pipeline row, "Call booked" on the timeline, and drives the AI's next action ("Prepare for the discovery call…"). A booked time that passes with nothing logged becomes **Missed follow-up** in Needs attention, and the brief switches to "Reschedule…". **Mark done** clears it.
+
+## Sign in
+
+Email + password (`app_users`, bcrypt) or **Sign in with Google** for the internal team — set `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` (see `.env.example`); until then the button explains it isn't configured. Only existing accounts or new `@experience.com` accounts (`GOOGLE_ALLOWED_DOMAINS`) get in. Customers never sign in: they use `/inquire`.
+
+## Where leads come from
+
+- **Customer form** — `/inquire` (localhost:3000/inquire). The public page a prospect fills in; in production it is linked from the Experience.com website.
+- **Internal** — the **+ New Lead** button, for phone-in or manually captured inquiries.
+- **Other channels** — `POST /api/inquiries` with header `X-Inbound-Key: <INBOUND_API_KEY>`. Any system that captures interest — a website chat agent, a partner landing page, an automation — can create leads here. Body: `companyName, contactName, workEmail, phone?, numberOfUsers, interest, industry?, requirements, additionalInfo?, source?`. Replies `201 { leadId, companyId, companyMatched, leadUrl }`. Same de-dup and AI brief as the form; the timeline records the source (e.g. "Lead created from API (branvidia-chat)").
+
+All three ask for the prospect's **industry**, which the pipeline shows on each row and filters by from the sidebar.
+
+## Guided Selling
+
+The Guided Selling module (Quote → Approval → Contract → E-signature → Renewal) lives in **`modules/guided-selling`**
+(FastAPI + Vite/React, its own toolchain; see its README). One-time setup:
+
+```bash
+cd modules/guided-selling
+python3 -m venv .venv && source .venv/bin/activate && pip install -r requirements.txt
+cd ../..
+```
+
+After that, **`npm run dev` starts both** — the workspace on :3000 and the module on :8001 (it reads
+`QUOTE_WORKSPACE_URL` and `HANDOFF_API_KEY` from `.env.local`); `npm run dev:web` starts the workspace alone.
+Rebuild the module's UI only after changing files under `modules/guided-selling/frontend`:
+`(cd modules/guided-selling/frontend && npm install && npm run build)`.
+
+**Continue to Guided Selling** pushes the schema-2.0 quote context to `POST /api/handoffs` on the module
+and opens the **Guided Selling** page, where the module is embedded on the same customer (Lead handoff →
+Accept → Customer 360 → Contract → Signing → Documents → Renewal). No quote amount, package or discount is
+sent — the module prices the deal; the customer's budget travels as context only. The module keeps its
+inbox in memory, so if it restarts the Guided Selling page re-delivers the selected opportunity's context
+automatically (same id, same customer — never a duplicate). Contract: **[docs/QUOTE_HANDOFF.md](docs/QUOTE_HANDOFF.md)**.
+
+## Scope boundary
+
+This module owns everything from inquiry through the Guided Selling handoff (Customer Inquiry → Opportunity → Qualification → AI Opportunity Intelligence → Quote Context). Package recommendation, quote versioning, pricing/discount rules, approvals, contracts, e-signature, document storage and renewals belong to the downstream Quote/Contract portion of the Sales Engine and are intentionally not duplicated here; the handoff screen is the integration point, and it passes company, all contacts, user count, interest, requirements and qualification so Guided Selling can consume them.

@@ -3,10 +3,11 @@ import Link from "next/link";
 import { Search, Phone, Mail, MessageSquare, StickyNote, RefreshCcw, ArrowUpRight } from "lucide-react";
 import { format, isToday, isYesterday } from "date-fns";
 import { listActivityFeed } from "@/lib/repo/activities";
-import { parseDateFilter, describeDateFilter, type DateFilter } from "@/lib/dashboard";
+import { parseDateFilter, type DateFilter } from "@/lib/dashboard";
 import { activityLabel, formatActivityTime } from "@/lib/format";
 import type { ActivityType } from "@/lib/types";
 import { Input } from "@/components/ui/input";
+import { DateRangeField } from "@/components/dashboard/date-range-field";
 import { StageBadge } from "@/components/dashboard/leads-table";
 import { cn } from "@/lib/utils";
 
@@ -127,11 +128,6 @@ export default async function ActivityPage({ searchParams }: PageProps<"/activit
                 {t.label}
               </Link>
             ))}
-            {dateFilter.range !== "all" && (
-              <span className="ml-2 rounded-md bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground">
-                {describeDateFilter(dateFilter)}
-              </span>
-            )}
             {industry && (
               <span className="rounded-md bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground">{industry}</span>
             )}
@@ -141,7 +137,18 @@ export default async function ActivityPage({ searchParams }: PageProps<"/activit
               </span>
             )}
           </div>
-          <form className="flex items-center gap-2" action="/activity" role="search">
+          <div className="flex flex-wrap items-center gap-2">
+            <DateRangeField
+              filter={dateFilter}
+              basePath="/activity"
+              keep={{
+                ...(type !== "all" ? { type } : {}),
+                ...(industry ? { industry } : {}),
+                ...(owner ? { owner } : {}),
+                ...(q ? { q } : {}),
+              }}
+            />
+            <form className="flex items-center gap-2" action="/activity" role="search">
             {[...keep.entries()].filter(([k]) => k !== "q").map(([k, v]) => (
               <input key={k} type="hidden" name={k} value={v} />
             ))}
@@ -149,8 +156,9 @@ export default async function ActivityPage({ searchParams }: PageProps<"/activit
             <div className="relative">
               <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
               <Input name="q" defaultValue={q} placeholder="Filter by company or text" className="h-8 w-full pl-8 text-[13px] sm:w-60" />
-            </div>
-          </form>
+              </div>
+            </form>
+          </div>
         </div>
 
         {rows.length === 0 ? (

@@ -20,6 +20,7 @@ import { needsAttention, inDateRange, parseDateFilter, describeDateFilter } from
 import { LeadsTable } from "@/components/dashboard/leads-table";
 import { cn } from "@/lib/utils";
 import { Input } from "@/components/ui/input";
+import { DateRangeField } from "@/components/dashboard/date-range-field";
 
 export default async function PipelinePage({ searchParams }: PageProps<"/pipeline">) {
   const params = await searchParams;
@@ -116,14 +117,6 @@ export default async function PipelinePage({ searchParams }: PageProps<"/pipelin
                 </Link>
               );
             })}
-            {range !== "all" && (
-              <span className="ml-2 inline-flex items-center gap-1.5 rounded-md bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground">
-                <span className="font-normal text-muted-foreground/80">Date</span> <span className="text-foreground">{describeDateFilter(dateFilter)}</span>
-                <Link href={withKeep("/pipeline", { range: "", from: "", to: "", ...(stage !== "all" ? { stage } : {}) })} className="hover:text-foreground" aria-label="Clear date range">
-                  ×
-                </Link>
-              </span>
-            )}
             {owner && (
               <span className="inline-flex items-center gap-1.5 rounded-md bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground">
                 <span className="font-normal text-muted-foreground/80">Owner</span> <span className="text-foreground">{ownerLabel}</span>
@@ -141,21 +134,35 @@ export default async function PipelinePage({ searchParams }: PageProps<"/pipelin
               </span>
             )}
           </div>
-          <form className="flex items-center gap-2" action="/pipeline" role="search">
-            <input type="hidden" name="stage" value={stage} />
-            {[...keep.entries()].map(([k, v]) => (
-              <input key={k} type="hidden" name={k} value={v} />
-            ))}
-            <div className="relative">
-              <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
-              <Input
-                name="q"
-                defaultValue={q}
-                placeholder="Filter by company or contact"
-                className="h-8 w-full pl-8 text-[13px] sm:w-60"
-              />
-            </div>
-          </form>
+          <div className="flex flex-wrap items-center gap-2">
+            {/* Start date → End date, inline, the way a range reads elsewhere in
+                the product — rather than a dropdown that hides what it applied. */}
+            <DateRangeField
+              filter={dateFilter}
+              basePath="/pipeline"
+              keep={{
+                ...(stage !== "all" ? { stage } : {}),
+                ...(industry ? { industry } : {}),
+                ...(owner ? { owner } : {}),
+                ...(q ? { q } : {}),
+              }}
+            />
+            <form className="flex items-center gap-2" action="/pipeline" role="search">
+              <input type="hidden" name="stage" value={stage} />
+              {[...keep.entries()].map(([k, v]) => (
+                <input key={k} type="hidden" name={k} value={v} />
+              ))}
+              <div className="relative">
+                <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
+                <Input
+                  name="q"
+                  defaultValue={q}
+                  placeholder="Filter by company or contact"
+                  className="h-8 w-full pl-8 text-[13px] sm:w-60"
+                />
+              </div>
+            </form>
+          </div>
         </div>
         {(industry || owner || range !== "all" || q) && (
           <div className="flex flex-wrap items-center justify-between gap-2 border-t border-border bg-muted/30 px-4 py-2 text-[12px] text-muted-foreground">

@@ -1,15 +1,13 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { useState } from "react";
+import { usePathname, useSearchParams } from "next/navigation";
 import { AlertTriangle, KanbanSquare, Inbox, CalendarDays, Building2, Home, Users, PackageCheck, ListChecks } from "lucide-react";
 import { DOWNSTREAM } from "@/lib/modules";
 import type { TeamMember } from "@/lib/repo/users";
 import { ExperienceLogo } from "@/components/brand/logo";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
-import { DATE_RANGES, DATE_RANGE_LABELS, parseDateRange, type DateRange } from "@/lib/dashboard";
+import { parseDateRange, type DateRange } from "@/lib/dashboard";
 import { format } from "date-fns";
 
 export interface IndustryCount {
@@ -20,9 +18,11 @@ export interface IndustryCount {
 /**
  * Left navigation in the VOCE / Experience.com product language: white
  * surface, hairline right border, muted section labels, soft gray active pill.
- * Pinned to the viewport. Sections: brand · Sales Engine (Home, Pipeline,
- * Companies, follow-through, handoff) · Date range · Team · Industry · Today.
- * Filters compose (stage + date + industry + owner) via the URL.
+ * Pinned to the viewport. Sections: brand · Sales Engine · Follow-through ·
+ * Team · Industry · Today. The date range lives on the pages it filters
+ * (Pipeline, Recent activity) as a start → end field, so the dates in effect
+ * are visible rather than hidden behind a dropdown. Filters still compose
+ * (stage + date + industry + owner) via the URL.
  */
 export function Sidebar({
   attentionCount,
@@ -41,7 +41,6 @@ export function Sidebar({
   taskCount: number;
 }) {
   const pathname = usePathname();
-  const router = useRouter();
   const sp = useSearchParams();
   const stage = sp.get("stage") ?? "all";
   const range = parseDateRange(sp.get("range"));
@@ -133,21 +132,6 @@ export function Sidebar({
               {DOWNSTREAM.navLabel}
             </NavItem>
           </ul>
-        </div>
-
-        {/* Date range — dropdown, with a start → end picker for custom. Keyed on the
-            URL's values so the control re-derives its state whenever filters change. */}
-        <div className="px-1">
-          <p className="section-label px-2 pb-2">Date range</p>
-          <DateRangeControl
-            key={`${range}|${from}|${to}`}
-            range={range}
-            from={from}
-            to={to}
-            onPreset={(r) => router.push(href({ range: r }))}
-            onCustom={(f, t) => router.push(href({ range: "custom", from: f, to: t }))}
-            onClear={() => router.push(href({ range: "all" }))}
-          />
         </div>
 
         {/* Team — who owns what. "My leads" for your own book; a colleague's name to cover for them. */}
@@ -301,101 +285,5 @@ function NavItem({
         )}
       </Link>
     </li>
-  );
-}
-
-
-function DateRangeControl({
-  range,
-  from,
-  to,
-  onPreset,
-  onCustom,
-  onClear,
-}: {
-  range: DateRange;
-  from: string;
-  to: string;
-  onPreset: (r: string) => void;
-  onCustom: (from: string, to: string) => void;
-  onClear: () => void;
-}) {
-  const [customOpen, setCustomOpen] = useState(range === "custom");
-  const [draftFrom, setDraftFrom] = useState(from);
-  const [draftTo, setDraftTo] = useState(to);
-
-  return (
-    <>
-      <Select
-        value={customOpen ? "custom" : range}
-        onValueChange={(value) => {
-          if (value === "custom") {
-            setCustomOpen(true);
-            return;
-          }
-          setCustomOpen(false);
-          onPreset(value);
-        }}
-      >
-        <SelectTrigger className="h-9 text-[13px]">
-          <span className="flex items-center gap-2">
-            <CalendarDays className="h-3.5 w-3.5 text-muted-foreground" />
-            <SelectValue />
-          </span>
-        </SelectTrigger>
-        <SelectContent>
-          {DATE_RANGES.map((r) => (
-            <SelectItem key={r} value={r}>
-              {DATE_RANGE_LABELS[r]}
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
-      {customOpen && (
-        <div className="mt-2 space-y-2 rounded-lg border border-border bg-muted/40 p-2.5">
-          <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-1.5">
-            <input
-              type="date"
-              value={draftFrom}
-              max={draftTo || undefined}
-              onChange={(e) => setDraftFrom(e.target.value)}
-              aria-label="Start date"
-              className="h-8 min-w-0 rounded-md border border-input bg-card px-2 text-xs text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/30"
-            />
-            <span className="text-xs text-muted-foreground">→</span>
-            <input
-              type="date"
-              value={draftTo}
-              min={draftFrom || undefined}
-              onChange={(e) => setDraftTo(e.target.value)}
-              aria-label="End date"
-              className="h-8 min-w-0 rounded-md border border-input bg-card px-2 text-xs text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/30"
-            />
-          </div>
-          <div className="flex justify-end gap-1.5">
-            <button
-              type="button"
-              onClick={() => {
-                setCustomOpen(false);
-                setDraftFrom("");
-                setDraftTo("");
-                onClear();
-              }}
-              className="rounded-md px-2 py-1 text-xs text-muted-foreground hover:text-foreground"
-            >
-              Clear
-            </button>
-            <button
-              type="button"
-              onClick={() => (draftFrom || draftTo) && onCustom(draftFrom, draftTo)}
-              disabled={!draftFrom && !draftTo}
-              className="rounded-md bg-navy px-2.5 py-1 text-xs font-medium text-white disabled:opacity-50"
-            >
-              Apply
-            </button>
-          </div>
-        </div>
-      )}
-    </>
   );
 }

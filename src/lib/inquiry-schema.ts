@@ -23,6 +23,20 @@ const optionalText = z
   .optional()
   .transform((v) => (v ? v : undefined));
 
+/**
+ * Phone is how sales actually reaches an inbound inquiry — an email address
+ * alone means the first contact attempt is a message into the void — so it is
+ * required. The pattern is deliberately loose: it accepts international
+ * prefixes, spaces, dots, dashes and parentheses, and only rejects input that
+ * could not be a number at all.
+ */
+const phone = z
+  .string({ error: "Phone number is required" })
+  .trim()
+  .min(1, "Phone number is required")
+  .regex(/^[+(]?[\d][\d\s().+-]{5,}$/, "Enter a phone number we can reach you on, e.g. +1 (415) 555-0123")
+  .max(40, "That phone number looks too long");
+
 const numberOfUsers = z.coerce
   .number({ error: "Enter how many people will use the platform" })
   .int("Enter a whole number")
@@ -37,9 +51,12 @@ export const InquiryInput = z.object({
   companyName: z.string().trim().min(1, "Company name is required"),
   contactName: z.string().trim().min(1, "Your full name is required"),
   workEmail: z.string().trim().min(1, "Work email is required").email("Enter a valid work email, e.g. jane@company.com"),
-  phone: optionalText,
+  phone,
   numberOfUsers,
-  interest: z.string().trim().min(1, "Choose what you're interested in"),
+  // Optional: plenty of inquiries describe the need in their own words
+  // instead, and the AI brief raises it as a qualification gap when neither is
+  // given rather than the form blocking the customer over it.
+  interest: optionalText,
   industry: z.string().trim().optional().transform((v) => (v ? v : undefined)),
   requirements: optionalText,
   additionalInfo: optionalText,

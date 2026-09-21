@@ -22,7 +22,7 @@ export async function createInquiryLead(data: InquiryInputType, source: string) 
     companyId: company.id,
     primaryContactId: contact.id,
     numberOfUsers: data.numberOfUsers,
-    interest: data.interest,
+    interest: data.interest ?? null,
     requirements: data.requirements ?? null,
     additionalInfo: data.additionalInfo ?? null,
     source,

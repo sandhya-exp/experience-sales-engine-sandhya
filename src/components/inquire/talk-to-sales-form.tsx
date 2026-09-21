@@ -94,7 +94,7 @@ export function TalkToSalesForm() {
           <Field id="tts-workEmail" label="Work email" required error={errors.workEmail}>
             <Input id="tts-workEmail" name="workEmail" type="email" inputMode="email" autoComplete="email" placeholder="jane@acmemortgage.com" value={values.workEmail} onChange={(e) => set("workEmail")(e.target.value)} onBlur={blur("workEmail")} aria-invalid={!!errors.workEmail} aria-describedby={errors.workEmail ? "tts-workEmail-error" : undefined} />
           </Field>
-          <Field id="tts-phone" label="Phone" optional error={errors.phone}>
+          <Field id="tts-phone" label="Phone" required error={errors.phone}>
             <Input id="tts-phone" name="phone" type="tel" inputMode="tel" autoComplete="tel" placeholder="+1 (415) 555-0123" value={values.phone} onChange={(e) => set("phone")(e.target.value)} onBlur={blur("phone")} aria-invalid={!!errors.phone} />
           </Field>
         </div>
@@ -129,7 +129,7 @@ export function TalkToSalesForm() {
             <Input id="tts-numberOfUsers" name="numberOfUsers" type="number" inputMode="numeric" min={1} step={1} placeholder="250" value={values.numberOfUsers} onChange={(e) => set("numberOfUsers")(e.target.value)} onBlur={blur("numberOfUsers")} aria-invalid={!!errors.numberOfUsers} aria-describedby={errors.numberOfUsers ? "tts-numberOfUsers-error" : "tts-numberOfUsers-hint"} />
           </Field>
         </div>
-        <Field id="tts-interest" label="What are you interested in?" required error={errors.interest}>
+        <Field id="tts-interest" label="What are you interested in?" optional error={errors.interest}>
           <Select
             value={values.interest || undefined}
             onValueChange={(v) => {

@@ -385,7 +385,11 @@ function deterministicFollowUps(lead: Lead, base: OpportunityIntelligence): Anal
   if (base.quote_context.deployment && base.quote_context.users) out.push({ gap: "Users per location unclear", question: `Is the ${base.quote_context.users}-user figure across all ${base.quote_context.deployment}, and will every location go live at once or in phases?`, source: "inquiry" });
   else if (base.quote_context.deployment) out.push({ gap: "User count per location", question: `How many people at each of the ${base.quote_context.deployment} will use the platform?`, source: "inquiry" });
   if (/\b(dashboard|report(?:ing)?)\b/i.test(text)) out.push({ gap: "Reporting needs unspecified", question: "Who needs to see the reporting — per location, per team, or a single group view — and how often?", source: "inquiry" });
-  if (lead.interest === "Something else") out.push({ gap: "Requested capability unclear", question: "What outcome are you hoping to achieve, and what does success look like in six months?", source: "inquiry" });
+  // "Something else", or nothing at all now that the interest field is optional:
+  // either way the inquiry has not said which capability it wants, and that is
+  // the question to open the call with.
+  if (lead.interest === "Something else" || !lead.interest?.trim())
+    out.push({ gap: "Requested capability unclear", question: "What outcome are you hoping to achieve, and what does success look like in six months?", source: "inquiry" });
   return out.slice(0, 3);
 }
 

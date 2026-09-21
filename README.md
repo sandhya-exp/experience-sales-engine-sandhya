@@ -94,7 +94,7 @@ The rule lives in one predicate (`canAccessContract`, `src/lib/roles.ts`) that b
 
 ## Talk to Sales and discovery-call booking
 
-The customer-facing entry point is **Talk to Sales** (`/inquire`; `/talk-to-sales` redirects there). Required: company, full name, work email, industry (select), number of users, what they're interested in. Optional: phone, what they're looking to achieve, additional information. Every field is controlled and validated inline against the same zod schema the server uses (`src/lib/inquiry-schema.ts`) — an invalid email shows its message under the field and nothing else changes; no reload, no reset.
+The customer-facing entry point is **Talk to Sales** (`/inquire`; `/talk-to-sales` redirects there). Required: company, full name, work email, phone, industry (select), number of users. Optional: what they're interested in, what they're looking to achieve, additional information. Phone is required because it is how the first contact attempt actually happens; the interest select is not, since many inquiries describe the need in their own words instead — when neither is given, the AI brief opens with that as the qualification gap. Every field is controlled and validated inline against the same zod schema the server uses (`src/lib/inquiry-schema.ts`) — an invalid email shows its message under the field and nothing else changes; no reload, no reset.
 
 On the confirmation page the customer can book a **discovery call** from the sales team's real availability:
 

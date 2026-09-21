@@ -38,7 +38,7 @@ export function NewLeadDialog({ children }: { children: React.ReactNode }) {
               <Input type="email" name="email" required />
             </F>
             <F label="Phone" error={state.errors.phone}>
-              <Input name="phone" />
+              <Input name="phone" required />
             </F>
           </div>
           <div className="grid grid-cols-2 gap-3">
@@ -61,7 +61,7 @@ export function NewLeadDialog({ children }: { children: React.ReactNode }) {
             </F>
           </div>
           <F label="Interested in" error={state.errors.interest}>
-            <Input name="interest" required />
+            <Input name="interest" />
           </F>
           <F label="Requirements" error={state.errors.requirements}>
             <Textarea name="requirements" rows={2} required />

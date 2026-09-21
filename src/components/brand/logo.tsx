@@ -9,11 +9,32 @@ import { cn } from "@/lib/utils";
 // header never shows a broken image.
 const LOGO_SRC = "/brand/exp.png";
 
-export function ExperienceLogo({ className, dark }: { className?: string; dark?: boolean }) {
+/**
+ * Sizes follow the VOCE product, where the wordmark carries the top of the
+ * sidebar rather than sitting in it apologetically: "lg" is the sidebar and the
+ * sign-in screen, "sm" the compact header that replaces the sidebar on small
+ * screens. The text fallback scales with it, so a missing PNG changes the mark
+ * but never the layout.
+ */
+const SIZE = {
+  sm: { img: "h-6", text: "text-lg" },
+  lg: { img: "h-8", text: "text-2xl" },
+} as const;
+
+export function ExperienceLogo({
+  className,
+  dark,
+  size = "lg",
+}: {
+  className?: string;
+  dark?: boolean;
+  size?: keyof typeof SIZE;
+}) {
   const [failed, setFailed] = useState(false);
   // The image starts hidden and is revealed on load, so a missing or slow file
   // never flashes the browser's broken-image alt text before onError fires.
   const [loaded, setLoaded] = useState(false);
+  const s = SIZE[size];
 
   if (!failed) {
     const img = (
@@ -21,7 +42,7 @@ export function ExperienceLogo({ className, dark }: { className?: string; dark?:
       <img
         src={LOGO_SRC}
         alt="Experience.com"
-        className={cn("h-5 w-auto", loaded ? "block" : "hidden")}
+        className={cn(s.img, "w-auto", loaded ? "block" : "hidden")}
         onLoad={() => setLoaded(true)}
         onError={() => setFailed(true)}
       />
@@ -29,8 +50,8 @@ export function ExperienceLogo({ className, dark }: { className?: string; dark?:
     if (!loaded) {
       return (
         <div className={cn("flex items-center gap-1.5 font-semibold tracking-tight", className)}>
-          <span className={cn("text-lg", dark ? "text-white" : "text-navy")}>experience</span>
-          <span className={cn("text-lg", dark ? "text-white/70" : "text-primary")}>.com</span>
+          <span className={cn(s.text, dark ? "text-white" : "text-navy")}>experience</span>
+          <span className={cn(s.text, dark ? "text-white/70" : "text-primary")}>.com</span>
           {img}
         </div>
       );
@@ -46,8 +67,8 @@ export function ExperienceLogo({ className, dark }: { className?: string; dark?:
 
   return (
     <div className={cn("flex items-center gap-1.5 font-semibold tracking-tight", className)}>
-      <span className={cn("text-lg", dark ? "text-white" : "text-navy")}>experience</span>
-      <span className={cn("text-lg", dark ? "text-white/70" : "text-primary")}>.com</span>
+      <span className={cn(s.text, dark ? "text-white" : "text-navy")}>experience</span>
+      <span className={cn(s.text, dark ? "text-white/70" : "text-primary")}>.com</span>
     </div>
   );
 }

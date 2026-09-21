@@ -22,7 +22,7 @@ export async function TopBar({ user, initialQuery }: { user: SessionUser; initia
   return (
     <header className="sticky top-0 z-30 flex h-14 items-center gap-4 border-b border-border bg-card/90 px-6 backdrop-blur">
       <Link href="/" className="flex items-center gap-3 lg:hidden">
-        <ExperienceLogo />
+        <ExperienceLogo size="sm" />
       </Link>
 
       <form action="/pipeline" method="get" role="search" className="relative hidden w-full max-w-md md:block">

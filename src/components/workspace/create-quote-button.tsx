@@ -14,8 +14,8 @@ import type { QualField } from "@/lib/ai/intelligence";
 /**
  * The one handoff control, in the opportunity header.
  *   gaps remain   → Complete Qualification →   (opens the missing field)
- *   ready         → Continue to Guided Selling → (verifies, finalizes quote context, marks Quote Ready, opens the review)
- *   handed off    → nothing (stage says Guided Selling; the sidebar entry opens the module)
+ *   ready         → Continue to Quote Ready → (verifies, finalizes quote context, marks Quote Ready, opens the review)
+ *   handed off    → nothing (stage says Quote Ready; the sidebar entry opens the module)
  */
 export function CreateQuoteButton({
   leadId,
@@ -32,8 +32,8 @@ export function CreateQuoteButton({
   const [pending, start] = useTransition();
   const [missing, setMissing] = useState<string[] | null>(null);
 
-  // Handed off: the stage selector already says Guided Selling/Won and the
-  // sidebar's Guided Selling entry is the way in — nothing to duplicate here.
+  // Handed off: the stage selector already says Quote Ready/Won and the
+  // sidebar's Quote Ready entry is the way in — nothing to duplicate here.
   if (status === "quoted" || status === "won" || status === "lost") return null;
 
   if (!complete) {

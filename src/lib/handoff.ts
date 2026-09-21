@@ -5,7 +5,7 @@ import { getWorkspaceData } from "@/lib/repo/workspace";
 import type { Activity, AiDealBrief, Company, Lead } from "@/lib/types";
 
 /**
- * The Guided Selling handoff: the single integration boundary between the
+ * The Quote Ready handoff: the single integration boundary between the
  * Lead & Deal Workspace (this app) and the downstream Quote → Contract →
  * E-signature → Renewal workspace.
  *
@@ -177,7 +177,7 @@ export interface QuoteWorkspaceConfig {
   endpoint: string | null;
   /**
    * Where to send the user afterwards. Supports {accountKey}, {leadId}.
-   * Defaults to {baseUrl}/?lead_id={leadId}&customer_id={accountKey} — the Guided Selling
+   * Defaults to {baseUrl}/?lead_id={leadId}&customer_id={accountKey} — the Quote Ready
    * module (modules/guided-selling) opens that handoff, or its Customer 360 once accepted.
    */
   accountUrlTemplate: string | null;

@@ -4,6 +4,10 @@ import { getCurrentUser } from "@/lib/auth";
 import { listLeadRows } from "@/lib/repo/leads";
 import { needsAttention } from "@/lib/dashboard";
 import { listTeam } from "@/lib/repo/users";
+import { listLatestBriefs } from "@/lib/repo/aiBriefs";
+import { listOverdueMeetings, listUpcomingMeetings } from "@/lib/repo/schedule";
+import { buildInsights } from "@/lib/insights";
+import { buildTasks } from "@/lib/tasks";
 import { Sidebar } from "@/components/shell/sidebar";
 import { TopBar } from "@/components/shell/topbar";
 
@@ -11,7 +15,16 @@ export default async function AppLayout({ children }: LayoutProps<"/">) {
   const user = await getCurrentUser();
   if (!user) redirect("/login");
 
-  const [rows, team] = await Promise.all([listLeadRows(), listTeam()]);
+  const [rows, team, briefs, upcoming, overdue] = await Promise.all([
+    listLeadRows(),
+    listTeam(),
+    listLatestBriefs(),
+    listUpcomingMeetings(50),
+    listOverdueMeetings(50),
+  ]);
+  // The sidebar counters read the same derivations the Tasks and Schedule
+  // views do, so a badge can never disagree with the list behind it.
+  const taskCount = buildTasks(buildInsights(rows, briefs), upcoming, overdue).length;
   const attentionCount = rows.filter((r) => needsAttention(r).flagged).length;
   const industryMap = new Map<string, number>();
   for (const r of rows) {
@@ -32,6 +45,8 @@ export default async function AppLayout({ children }: LayoutProps<"/">) {
           team={team}
           currentUserId={user.id}
           unassignedCount={unassigned}
+          taskCount={taskCount}
+          meetingCount={upcoming.length}
         />
       </Suspense>
       <div className="flex min-w-0 flex-1 flex-col">

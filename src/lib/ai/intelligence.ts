@@ -4,7 +4,7 @@ import { DOWNSTREAM } from "@/lib/modules";
 
 /**
  * AI Opportunity Intelligence — the bridge between a customer's raw
- * requirements and Guided Selling (quote → approval → contract).
+ * requirements and Quote Ready (quote → approval → contract).
  *
  * Five sections, each derived ONLY from data on the opportunity (inquiry text,
  * qualification fields, contacts, activity). It interprets, structures and
@@ -26,9 +26,9 @@ export interface OpportunityIntelligence {
   evidence?: EvidenceItem[];
   /** What the Sales Knowledge Base says is relevant — cited by document id. */
   product_context?: ProductContext;
-  /** Conflicts between what the customer wrote and what was qualified — confirm before Guided Selling. */
+  /** Conflicts between what the customer wrote and what was qualified — confirm before Quote Ready. */
   contradictions?: Contradiction[];
-  /** Is this opportunity ready to continue to Guided Selling? */
+  /** Is this opportunity ready to continue to Quote Ready? */
   readiness?: GuidedSellingReadiness;
   /** The one-look chain: customer said → retrieved → identified → gap → readiness → next action. */
   chain?: ChainStep[];

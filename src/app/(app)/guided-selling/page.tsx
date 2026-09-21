@@ -12,8 +12,8 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
 /**
- * Guided Selling — the handoff boundary. Left: opportunities already in Guided Selling
- * and qualified opportunities ready to continue. Right: the Guided Selling module
+ * Quote Ready — the handoff boundary. Left: opportunities already in Quote Ready
+ * and qualified opportunities ready to continue. Right: the Quote Ready module
  * (modules/guided-selling) embedded for the selected opportunity — handoff → Customer 360
  * → quote/contract → signing → documents → renewal.
  */

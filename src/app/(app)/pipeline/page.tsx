@@ -1,11 +1,12 @@
 import { Search, AlertTriangle } from "lucide-react";
+import { DOWNSTREAM } from "@/lib/modules";
 
 const STAGE_PILLS: { key: string; label: string }[] = [
   { key: "all", label: "All" },
   { key: "new", label: "New leads" },
   { key: "contacted", label: "Contacted" },
   { key: "qualified", label: "Qualified" },
-  { key: "quoted", label: "Guided Selling" },
+  { key: "quoted", label: DOWNSTREAM.name },
   { key: "won", label: "Won" },
   { key: "lost", label: "Lost" },
   { key: "attention", label: "Needs attention" },

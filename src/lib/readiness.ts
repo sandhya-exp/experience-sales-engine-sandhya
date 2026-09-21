@@ -34,7 +34,7 @@ export function computeReadiness(lead: Lead, contacts: Contact[]): QuoteReadines
     { key: "need", label: "Primary need", ok: Boolean(q.primary_need || lead.interest), hint: "Which products to configure" },
     { key: "timeline", label: "Decision timeline", ok: Boolean(q.decision_timeline), hint: "Sets quote validity and urgency" },
     { key: "decision_maker", label: "Decision maker identified", ok: Boolean(q.decision_maker), hint: "Who signs" },
-    { key: "budget", label: "Budget range", ok: Boolean(q.budget), hint: "Budget context for Guided Selling" },
+    { key: "budget", label: "Budget range", ok: Boolean(q.budget), hint: "Budget context for Quote Ready" },
   ];
   const passed = checks.filter((c) => c.ok).length;
   const complete = passed === checks.length;
@@ -49,7 +49,7 @@ export function computeReadiness(lead: Lead, contacts: Contact[]): QuoteReadines
   };
 }
 
-/** When the rep last pressed "Continue to Guided Selling" (recorded as an activity), if ever. */
+/** When the rep last pressed "Continue to Quote Ready" (recorded as an activity), if ever. */
 export function quoteReadyAt(activities: { metadata: Record<string, unknown>; occurred_at: string }[]): string | null {
   const hit = activities.find((a) => a.metadata?.kind === "quote_ready");
   return hit ? hit.occurred_at : null;

@@ -11,7 +11,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { QuoteHandoffConfirm } from "@/components/workspace/quote-handoff-confirm";
 
-// Quote Context review: exactly what Guided Selling receives, and the one button
+// Quote Context review: exactly what Quote Ready receives, and the one button
 // that sends it (see src/lib/handoff.ts and docs/QUOTE_HANDOFF.md).
 export default async function QuoteHandoffPage({ params }: PageProps<"/leads/[id]/quote">) {
   const { id } = await params;

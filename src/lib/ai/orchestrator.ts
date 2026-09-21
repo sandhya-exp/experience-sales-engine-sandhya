@@ -71,7 +71,9 @@ export async function runOpportunityIntelligence(leadId: string, source: Opportu
     base.quote_context.integrations.length ? "integration trigger" : "",
     (base.quote_context.users ?? 0) >= 1000 ? "enterprise thousands employees rollout phased security review procurement stakeholders" : "",
     lead.additional_info ?? "",
-    "guided selling handoff quote context",
+    // Matches the quote_prep documents by their own wording, so the query term
+    // tracks the stage name rather than drifting from it.
+    `${DOWNSTREAM.name.toLowerCase()} handoff quote context`,
   ].join(" ");
   const retrievedCapabilities = await tools.searchKnowledge(capabilityQuery, { categories: ["capability", "integration"], limit: 4 });
   const retrievedGuidance = await tools.searchKnowledge(guidanceQuery, { categories: ["qualification", "quote_prep"], limit: 3 });
@@ -252,7 +254,7 @@ export async function runOpportunityIntelligence(leadId: string, source: Opportu
     topGap
       ? { key: "gap", label: "Gap", text: `${topGap.label}${topGap.question ? ` — ask: “${topGap.question}”` : ""}`, sources: ["qualification", "inquiry"], tone: "warn" as const }
       : { key: "gap", label: "Gap", text: recordContradictions.length ? `Conflict: ${recordContradictions[0].topic} (${recordContradictions[0].a.value} vs ${recordContradictions[0].b.value})` : "None — every qualification item is captured.", sources: ["qualification"], tone: recordContradictions.length ? ("warn" as const) : ("ok" as const) },
-    { key: "readiness", label: `${DOWNSTREAM.partner} readiness`, text: ready ? "Ready" : `Not ready — still needed: ${blocking.slice(0, 3).join(", ")}${blocking.length > 3 ? ` +${blocking.length - 3}` : ""}`, sources: [], tone: ready ? ("ok" as const) : ("warn" as const) },
+    { key: "readiness", label: DOWNSTREAM.readinessLabel, text: ready ? "Ready" : `Not ready — still needed: ${blocking.slice(0, 3).join(", ")}${blocking.length > 3 ? ` +${blocking.length - 3}` : ""}`, sources: [], tone: ready ? ("ok" as const) : ("warn" as const) },
     { key: "next_action", label: "Next action", text: base.next_action.action, sources: [], tone: "neutral" as const },
   ];
 
@@ -321,7 +323,7 @@ interface AnalystResult {
   follow_up_questions: { gap: string; question: string; source: string }[];
 }
 
-const ANALYST_SYSTEM = `You are the Opportunity Analyst in Experience.com's Sales Engine. You read ONE opportunity record (inquiry, qualification, contacts, activity) and explain it to a salesperson preparing for Guided Selling.
+const ANALYST_SYSTEM = `You are the Opportunity Analyst in Experience.com's Sales Engine. You read ONE opportunity record (inquiry, qualification, contacts, activity) and explain it to a salesperson preparing for ${DOWNSTREAM.name}.
 
 Rules — these are hard constraints:
 - Use only facts present in the record. Never invent customer facts, numbers, names, systems, dates, pricing, packages, discounts or product capabilities.
@@ -413,7 +415,7 @@ function detectContradictions(lead: Lead, contacts: Contact[]): Contradiction[] 
       topic: "User count",
       a: { source: "inquiry", value: `${lead.number_of_users} users` },
       b: { source: "qualification", value: `${q.number_of_users} users` },
-      action: "Confirm the expected user count with the customer before Guided Selling — licence quantity depends on it.",
+      action: "Confirm the expected user count with the customer before Quote Ready — licence quantity depends on it.",
     });
   }
   if (lead.interest && q.primary_need && lead.interest !== "Something else" && !overlapsLoose(lead.interest, q.primary_need)) {
@@ -430,7 +432,7 @@ function detectContradictions(lead: Lead, contacts: Contact[]): Contradiction[] 
       topic: "Decision maker",
       a: { source: "inquiry", value: signer },
       b: { source: "qualification", value: q.decision_maker },
-      action: "Confirm who actually approves and signs — the contract in Guided Selling goes to this person.",
+      action: "Confirm who actually approves and signs — the contract in Quote Ready goes to this person.",
     });
   }
   const primary = contacts.find((c) => c.id === lead.primary_contact_id) ?? contacts.find((c) => c.is_primary);
@@ -461,17 +463,17 @@ function overlapsLoose(a: string, b: string) {
 
 /* ================================================ stage 2: solution context */
 
-const SOLUTION_SYSTEM = `You are the Solution Context agent in Experience.com's Sales Engine. Given one customer's need and the sales knowledge documents retrieved for it, identify what is relevant so Guided Selling receives good context.
+const SOLUTION_SYSTEM = `You are the Solution Context agent in Experience.com's Sales Engine. Given one customer's need and the sales knowledge documents retrieved for it, identify what is relevant so ${DOWNSTREAM.name} receives good context.
 
 Rules — hard constraints:
 - Use ONLY the provided knowledge documents for product and integration statements, and cite the document id on every item. Do not add capabilities, connectors or facts that are not in those documents.
-- Never mention pricing, packages, tiers, discounts or quote amounts — those are decided in Guided Selling.
+- Never mention pricing, packages, tiers, discounts or quote amounts — those are decided in ${DOWNSTREAM.name}.
 - Do not restate customer facts you were not given.
 - Be specific to this customer: say why each capability is relevant to their stated need.
 
 Return JSON: {"capabilities": [{"kb_id": string, "why": string (one sentence tying it to the customer's need)}] (1–3 items, only category "capability" or "integration" documents),
 "implementation_considerations": [{"text": string, "kb_id": string}] (2–4 short items: things to confirm or plan — triggers, locations, data, stakeholders),
-"quote_context_requirements": [{"text": string, "status": "captured" | "missing"}] (3–6 items: what Guided Selling needs from this deal; use captured_qualification / missing_qualification to set status)}`;
+"quote_context_requirements": [{"text": string, "status": "captured" | "missing"}] (3–6 items: what ${DOWNSTREAM.name} needs from this deal; use captured_qualification / missing_qualification to set status)}`;
 
 function validateSolution(raw: unknown): ProductContext {
   const o = obj(raw);
@@ -535,11 +537,11 @@ const EVALUATOR_SYSTEM = `You are the Readiness Evaluator in Experience.com's Sa
 Check for:
 1. Unsupported claims — any statement in customer_need, observations, evidence or product_context that asserts a customer fact, number, name, system, date or product capability NOT present in "facts" or in a retrieved knowledge document (ids in retrieved_ids). Pricing, packages, tiers, discounts or amounts are always unsupported.
 2. Contradictions — statements that conflict with the record (wrong user count, wrong system, wrong timeline, wrong contact role).
-3. Readiness — using qualification_checks, whether this opportunity has what Guided Selling needs.
+3. Readiness — using qualification_checks, whether this opportunity has what ${DOWNSTREAM.name} needs.
 
 Be strict but literal: paraphrase is fine, invention is not. Quote the offending text exactly as given.
 
-Return JSON: {"unsupported_claims": [{"text": string (exact text), "reason": string}], "contradictions": string[] (each one sentence naming the conflict), "verdict": string (one sentence for the salesperson on readiness for Guided Selling, mentioning what is still missing if anything)}`;
+Return JSON: {"unsupported_claims": [{"text": string (exact text), "reason": string}], "contradictions": string[] (each one sentence naming the conflict), "verdict": string (one sentence for the salesperson on readiness for ${DOWNSTREAM.name}, mentioning what is still missing if anything)}`;
 
 function validateEvaluator(raw: unknown): EvaluatorResult {
   const o = obj(raw);
@@ -582,7 +584,7 @@ function deterministicEvaluate(args: { analyst: AnalystResult; solution: Product
     return nums.find((n) => !facts.numbers.has(n) && !kbNumbers.has(n)) ?? null;
   };
   const problem = (text: string): string | null => {
-    if (COMMERCIAL.test(text)) return "Mentions pricing, packages, tiers or discounts — decided in Guided Selling, not here.";
+    if (COMMERCIAL.test(text)) return "Mentions pricing, packages, tiers or discounts — decided in Quote Ready, not here.";
     const n = unsupportedNumber(text);
     if (n) return `Contains the figure "${n}", which does not appear in the record.`;
     return null;

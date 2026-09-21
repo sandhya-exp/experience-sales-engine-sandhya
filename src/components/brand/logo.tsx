@@ -11,10 +11,30 @@ const LOGO_SRC = "/brand/exp.png";
 
 export function ExperienceLogo({ className, dark }: { className?: string; dark?: boolean }) {
   const [failed, setFailed] = useState(false);
+  // The image starts hidden and is revealed on load, so a missing or slow file
+  // never flashes the browser's broken-image alt text before onError fires.
+  const [loaded, setLoaded] = useState(false);
 
   if (!failed) {
-    // eslint-disable-next-line @next/next/no-img-element -- static brand asset, no optimization needed
-    const img = <img src={LOGO_SRC} alt="Experience.com" className="h-5 w-auto" onError={() => setFailed(true)} />;
+    const img = (
+      // eslint-disable-next-line @next/next/no-img-element -- static brand asset, no optimization needed
+      <img
+        src={LOGO_SRC}
+        alt="Experience.com"
+        className={cn("h-5 w-auto", loaded ? "block" : "hidden")}
+        onLoad={() => setLoaded(true)}
+        onError={() => setFailed(true)}
+      />
+    );
+    if (!loaded) {
+      return (
+        <div className={cn("flex items-center gap-1.5 font-semibold tracking-tight", className)}>
+          <span className={cn("text-lg", dark ? "text-white" : "text-navy")}>experience</span>
+          <span className={cn("text-lg", dark ? "text-white/70" : "text-primary")}>.com</span>
+          {img}
+        </div>
+      );
+    }
     // On the dark nav the logo sits in a white tile (like the contract module's
     // sidebar mark), so it renders correctly whether or not the PNG is transparent.
     return dark ? (

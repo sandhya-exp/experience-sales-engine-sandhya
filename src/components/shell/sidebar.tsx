@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useState } from "react";
-import { AlertTriangle, Activity, KanbanSquare, Inbox, CalendarDays, Building2, Home, Users, PackageCheck } from "lucide-react";
+import { AlertTriangle, Activity, KanbanSquare, Inbox, CalendarDays, Building2, Home, Users, PackageCheck, ListChecks, CalendarClock } from "lucide-react";
 import { DOWNSTREAM } from "@/lib/modules";
 import type { TeamMember } from "@/lib/repo/users";
 import { ExperienceLogo } from "@/components/brand/logo";
@@ -20,8 +20,9 @@ export interface IndustryCount {
 /**
  * Left navigation in the VOCE / Experience.com product language: white
  * surface, hairline right border, muted section labels, soft gray active pill.
- * Pinned to the viewport. Sections: brand · Pipeline · Date range · Industry ·
- * Handoff · Today. Filters compose (stage + date + industry) via the URL.
+ * Pinned to the viewport. Sections: brand · Sales Engine (Home, Pipeline,
+ * Companies, follow-through, handoff) · Date range · Team · Industry · Today.
+ * Filters compose (stage + date + industry + owner) via the URL.
  */
 export function Sidebar({
   attentionCount,
@@ -29,12 +30,18 @@ export function Sidebar({
   team,
   currentUserId,
   unassignedCount,
+  taskCount,
+  meetingCount,
 }: {
   attentionCount: number;
   industries: IndustryCount[];
   team: TeamMember[];
   currentUserId: string;
   unassignedCount: number;
+  /** Open tasks & follow-ups — the number on the Tasks entry. */
+  taskCount: number;
+  /** Discovery calls still ahead of us — the number on the Schedule entry. */
+  meetingCount: number;
 }) {
   const pathname = usePathname();
   const router = useRouter();
@@ -48,6 +55,9 @@ export function Sidebar({
   const onHome = pathname === "/";
   const onPipeline = pathname === "/pipeline";
   const onActivity = pathname === "/activity";
+  const onCompanies = pathname.startsWith("/companies");
+  const onTasks = pathname.startsWith("/tasks");
+  const onSchedule = pathname.startsWith("/schedule");
   const onDownstream = pathname === DOWNSTREAM.route;
   const leadMatch = pathname.match(/^\/leads\/([^/]+)/);
   const downstreamHref = leadMatch ? `${DOWNSTREAM.route}?lead=${leadMatch[1]}` : DOWNSTREAM.route;
@@ -108,6 +118,22 @@ export function Sidebar({
               badge={attentionCount > 0 ? attentionCount : undefined}
             >
               Needs attention
+            </NavItem>
+            <NavItem href="/companies" active={onCompanies} icon={Building2}>
+              Companies
+            </NavItem>
+          </ul>
+        </div>
+
+        {/* Follow-through — what has to happen next, and when. */}
+        <div>
+          <p className="section-label px-3 pb-2">Follow-through</p>
+          <ul className="space-y-0.5">
+            <NavItem href="/tasks" active={onTasks} icon={ListChecks} badge={taskCount > 0 ? taskCount : undefined}>
+              Tasks
+            </NavItem>
+            <NavItem href="/schedule" active={onSchedule} icon={CalendarClock} badge={meetingCount > 0 ? meetingCount : undefined}>
+              Schedule
             </NavItem>
             <NavItem href="/activity" active={onActivity} icon={Activity}>
               Recent activity

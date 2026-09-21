@@ -1,3 +1,5 @@
+import { DOWNSTREAM } from "@/lib/modules";
+
 export type LeadStatus = "new" | "contacted" | "qualified" | "quoted" | "won" | "lost";
 
 export const LEAD_STATUSES: LeadStatus[] = [
@@ -13,7 +15,7 @@ export const LEAD_STATUS_LABELS: Record<LeadStatus, string> = {
   new: "New Leads",
   contacted: "Contacted",
   qualified: "Qualified",
-  quoted: "Guided Selling",
+  quoted: DOWNSTREAM.name,
   won: "Won",
   lost: "Lost",
 };

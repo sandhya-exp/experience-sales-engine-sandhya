@@ -6,7 +6,7 @@ import { buildHandoffPayload } from "@/lib/handoff";
 /**
  * GET /api/handoff/{leadId}
  *
- * The "pull" side of the Guided Selling handoff: the downstream module fetches the
+ * The "pull" side of the Quote Ready handoff: the downstream module fetches the
  * complete lead/account context for a lead it was pointed at. Same payload the
  * "push" POST sends. Authorised by either a signed-in Sales Engine session
  * (same browser) or the shared HANDOFF_API_KEY header (server-to-server).

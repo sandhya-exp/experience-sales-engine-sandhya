@@ -57,3 +57,51 @@ export async function findOrCreateCompanyForEmail(
 export async function listCompanies(): Promise<Company[]> {
   return query<Company>("select * from companies order by created_at desc");
 }
+
+export interface CompanyRow extends Company {
+  contact_count: number;
+  opportunity_count: number;
+  open_count: number;
+  won_count: number;
+  /** Stage of the most recently created opportunity — what this account is doing now. */
+  latest_status: string | null;
+  latest_lead_id: string | null;
+  primary_contact_name: string | null;
+  primary_contact_email: string | null;
+  owner_name: string | null;
+  last_activity_at: string | null;
+  total_users: number | null;
+}
+
+/**
+ * Accounts view: every company we already know, with its contacts and its
+ * opportunities rolled up. Reads the existing companies/contacts/leads tables —
+ * there is no separate "account" record, which is exactly what stops a rep
+ * creating a second company for a customer who is already here.
+ */
+export async function listCompanyRows(): Promise<CompanyRow[]> {
+  return query<CompanyRow>(`
+    select
+      co.*,
+      (select count(*)::int from contacts ct where ct.company_id = co.id) as contact_count,
+      (select count(*)::int from leads l where l.company_id = co.id) as opportunity_count,
+      (select count(*)::int from leads l where l.company_id = co.id and l.status not in ('won','lost')) as open_count,
+      (select count(*)::int from leads l where l.company_id = co.id and l.status = 'won') as won_count,
+      (select sum(l.number_of_users)::int from leads l where l.company_id = co.id) as total_users,
+      lt.status as latest_status,
+      lt.id as latest_lead_id,
+      u.name as owner_name,
+      pc.name as primary_contact_name,
+      pc.email as primary_contact_email,
+      (select max(a.occurred_at) from activities a join leads l on l.id = a.lead_id where l.company_id = co.id) as last_activity_at
+    from companies co
+    left join lateral (
+      select id, status, owner_user_id from leads l where l.company_id = co.id order by l.created_at desc limit 1
+    ) lt on true
+    left join app_users u on u.id = lt.owner_user_id
+    left join lateral (
+      select name, email from contacts ct where ct.company_id = co.id order by ct.is_primary desc, ct.created_at asc limit 1
+    ) pc on true
+    order by co.created_at desc
+  `);
+}

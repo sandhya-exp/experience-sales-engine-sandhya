@@ -14,7 +14,7 @@ import { getKnowledgeDoc } from "@/lib/ai/knowledge/index";
  * AI Opportunity Intelligence — the full AI source of truth for one opportunity.
  *
  * Customer Need · Evidence · Relevant Product Context · Qualification Gaps ·
- * Recommended Next Action · Quote Context · Guided Selling Readiness, plus an
+ * Recommended Next Action · Quote Context · Quote Ready Readiness, plus an
  * expandable "AI Process" panel showing what was retrieved, which tools ran,
  * how each stage ran and what the evaluator concluded. Process metadata only —
  * never chain-of-thought.
@@ -236,7 +236,7 @@ function ReadinessPanel({ readiness }: { readiness: NonNullable<OpportunityIntel
     <div className={cn("rounded-xl border p-4", readiness.ready ? "border-success/30 bg-success/5" : "border-border bg-muted/40")}>
       <div className="flex items-start justify-between gap-3">
         <div>
-          <p className="section-label">{DOWNSTREAM.partner} readiness</p>
+          <p className="section-label">{DOWNSTREAM.readinessLabel}</p>
           <p className={cn("mt-1 flex items-center gap-2 text-[15px] font-semibold", readiness.ready ? "text-success" : "text-foreground")}>
             {readiness.ready ? <CheckCircle2 className="h-4 w-4" /> : <Circle className="h-4 w-4 text-warning" />}
             {readiness.ready ? `Ready to ${DOWNSTREAM.continueLabel.toLowerCase()}` : "Not ready yet"}

@@ -35,3 +35,30 @@ export async function saveBrief(
   );
   return saved as AiDealBrief;
 }
+
+export interface BriefRow {
+  lead_id: string;
+  summary: string;
+  next_action: string;
+  next_action_reason: string | null;
+  missing_info: string[];
+  generated_by: string;
+  generated_at: string;
+  intelligence: OpportunityIntelligence | Record<string, never>;
+}
+
+/**
+ * The newest brief per opportunity, in one query — what the Home dashboard's
+ * AI Insights section reads. No regeneration happens here: this is a read of
+ * what the orchestrator already produced and saved.
+ */
+export async function listLatestBriefs(): Promise<BriefRow[]> {
+  return query<BriefRow>(`
+    select distinct on (lead_id)
+      lead_id, summary, next_action, next_action_reason,
+      coalesce(missing_info, '[]'::jsonb) as missing_info,
+      generated_by, generated_at, coalesce(intelligence, '{}'::jsonb) as intelligence
+    from ai_deal_briefs
+    order by lead_id, generated_at desc
+  `);
+}

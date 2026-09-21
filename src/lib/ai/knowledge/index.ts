@@ -5,9 +5,9 @@
  * These are sales-enablement notes, not a product catalogue: they describe the
  * capability areas a prospect can express interest in (the same list as the
  * inquiry form), the integrations prospects most often ask about by industry,
- * how the team qualifies an opportunity, and what Guided Selling needs to
+ * how the team qualifies an opportunity, and what Quote Ready needs to
  * receive. They deliberately contain NO pricing, packages, tiers or discounts —
- * that is Guided Selling's domain, downstream of this module.
+ * that is Quote Ready's domain, downstream of this module.
  *
  * Every document has a stable id so the AI can cite it and the evaluator can
  * verify that anything cited was actually retrieved.
@@ -113,7 +113,7 @@ export const SALES_KNOWLEDGE: KnowledgeDoc[] = [
     category: "quote_prep",
     tags: ["enterprise", "large", "thousands", "employees", "rollout", "phased", "security review", "SSO", "procurement", "stakeholders", "IT", "compliance", "pilot"],
     content:
-      "Opportunities in the thousands of users behave differently from a single-location sale: expect a security and data-handling review, IT and procurement as stakeholders alongside the business sponsor, a phased rollout (often a pilot region or department first) and an integration for user provisioning rather than manual user creation. Before Guided Selling, confirm the provisioning source (usually the HRIS), the rollout sequence, who owns the security review and who signs — the business sponsor who submitted the inquiry frequently is not the signer. These points shape the implementation plan that accompanies the quote; the quote itself is still built in Guided Selling.",
+      "Opportunities in the thousands of users behave differently from a single-location sale: expect a security and data-handling review, IT and procurement as stakeholders alongside the business sponsor, a phased rollout (often a pilot region or department first) and an integration for user provisioning rather than manual user creation. Before Quote Ready, confirm the provisioning source (usually the HRIS), the rollout sequence, who owns the security review and who signs — the business sponsor who submitted the inquiry frequently is not the signer. These points shape the implementation plan that accompanies the quote; the quote itself is still built in Quote Ready.",
   },
   {
     id: "int-messaging-automation",
@@ -121,7 +121,7 @@ export const SALES_KNOWLEDGE: KnowledgeDoc[] = [
     category: "integration",
     tags: ["Slack", "Zapier", "notifications", "alerts", "automation", "workflow"],
     content:
-      "Slack is typically requested for alerting a team when a negative review or low survey score arrives. Zapier-style automation comes up when the prospect's transaction system has no direct connector. Both are secondary to the main trigger integration and rarely change the deal scope, but should be noted so Guided Selling can include them in the solution description.",
+      "Slack is typically requested for alerting a team when a negative review or low survey score arrives. Zapier-style automation comes up when the prospect's transaction system has no direct connector. Both are secondary to the main trigger integration and rarely change the deal scope, but should be noted so Quote Ready can include them in the solution description.",
   },
 
   /* ------------------------------------------------------------ qualification */
@@ -131,7 +131,7 @@ export const SALES_KNOWLEDGE: KnowledgeDoc[] = [
     category: "qualification",
     tags: ["users", "seats", "licence", "agents", "locations", "headcount", "quantity"],
     content:
-      "The user count on an inquiry is a customer estimate. Before Guided Selling it must be confirmed and disambiguated: does 'users' mean staff who log in, front-line people who appear on review pages (agents, loan officers, providers), or the number of locations? Multi-location prospects should give both the location count and the users per location. Licence quantity is the single biggest driver of the quote, so an unconfirmed count blocks readiness.",
+      "The user count on an inquiry is a customer estimate. Before Quote Ready it must be confirmed and disambiguated: does 'users' mean staff who log in, front-line people who appear on review pages (agents, loan officers, providers), or the number of locations? Multi-location prospects should give both the location count and the users per location. Licence quantity is the single biggest driver of the quote, so an unconfirmed count blocks readiness.",
   },
   {
     id: "qual-decision-maker",
@@ -139,7 +139,7 @@ export const SALES_KNOWLEDGE: KnowledgeDoc[] = [
     category: "qualification",
     tags: ["decision maker", "signer", "authority", "approval", "budget owner", "champion"],
     content:
-      "The decision maker is the person with authority to approve the purchase and sign — often not the person who submitted the inquiry. Confirm on the first call: who approves spend at this level, who else is involved (IT, operations, compliance) and whether the contact is a champion or the signer. Guided Selling uses the decision maker as the signer for the contract step, so a missing or wrong decision maker stalls approval.",
+      "The decision maker is the person with authority to approve the purchase and sign — often not the person who submitted the inquiry. Confirm on the first call: who approves spend at this level, who else is involved (IT, operations, compliance) and whether the contact is a champion or the signer. Quote Ready uses the decision maker as the signer for the contract step, so a missing or wrong decision maker stalls approval.",
   },
   {
     id: "qual-timeline-budget",
@@ -147,7 +147,7 @@ export const SALES_KNOWLEDGE: KnowledgeDoc[] = [
     category: "qualification",
     tags: ["timeline", "urgency", "budget", "fiscal year", "board", "renewal date", "competitor contract"],
     content:
-      "Timeline sets quote validity and urgency: ask what is driving the date (a competitor contract ending, a board or fiscal deadline, a new-location opening). Budget is captured as context only — a range or an approval ceiling the customer has stated. It is passed to Guided Selling as background and never becomes a price, package or discount in this module. If the customer has not stated a budget, record it as missing rather than estimating one.",
+      "Timeline sets quote validity and urgency: ask what is driving the date (a competitor contract ending, a board or fiscal deadline, a new-location opening). Budget is captured as context only — a range or an approval ceiling the customer has stated. It is passed to Quote Ready as background and never becomes a price, package or discount in this module. If the customer has not stated a budget, record it as missing rather than estimating one.",
   },
   {
     id: "qual-current-solution",
@@ -163,25 +163,25 @@ export const SALES_KNOWLEDGE: KnowledgeDoc[] = [
     category: "qualification",
     tags: ["contact", "email", "stakeholders", "IT", "operations", "marketing", "multiple contacts"],
     content:
-      "A verified primary contact with a working email is required — the quote and contract go to them. Larger deals usually involve several contacts (operations lead, IT/security, marketing, finance). Add each to the opportunity with their role so Guided Selling receives the full stakeholder list rather than a single name.",
+      "A verified primary contact with a working email is required — the quote and contract go to them. Larger deals usually involve several contacts (operations lead, IT/security, marketing, finance). Add each to the opportunity with their role so Quote Ready receives the full stakeholder list rather than a single name.",
   },
 
   /* --------------------------------------------------------------- quote prep */
   {
     id: "qp-guided-selling-inputs",
-    title: "What Guided Selling needs from qualification",
+    title: "What Quote Ready needs from qualification",
     category: "quote_prep",
     tags: ["guided selling", "handoff", "quote context", "readiness", "inputs", "checklist"],
     content:
-      "Guided Selling builds the quote, approval and contract from the quote context this module hands over. The handoff should carry: customer and industry, confirmed user count and deployment scope (locations), primary need and any secondary capabilities, named integrations with their role (trigger source vs. notification), current solution, decision timeline, decision maker (used as signer), budget as stated context, primary contact and the full contact list. Anything unconfirmed should be marked as a gap, not filled with an assumption.",
+      "Quote Ready builds the quote, approval and contract from the quote context this module hands over. The handoff should carry: customer and industry, confirmed user count and deployment scope (locations), primary need and any secondary capabilities, named integrations with their role (trigger source vs. notification), current solution, decision timeline, decision maker (used as signer), budget as stated context, primary contact and the full contact list. Anything unconfirmed should be marked as a gap, not filled with an assumption.",
   },
   {
     id: "qp-no-pricing-here",
-    title: "Pricing, packages and discounts are decided in Guided Selling",
+    title: "Pricing, packages and discounts are decided in Quote Ready",
     category: "quote_prep",
     tags: ["pricing", "price", "package", "tier", "discount", "quote amount", "boundary"],
     content:
-      "This module never states a price, package, tier, discount or quote amount. The quote amount is always 'To be quoted' until Guided Selling sets it. The AI may explain what will affect the quote (user quantity, number of locations, integrations, timeline) but must not estimate figures or recommend a package.",
+      "This module never states a price, package, tier, discount or quote amount. The quote amount is always 'To be quoted' until Quote Ready sets it. The AI may explain what will affect the quote (user quantity, number of locations, integrations, timeline) but must not estimate figures or recommend a package.",
   },
   {
     id: "qp-multi-location",

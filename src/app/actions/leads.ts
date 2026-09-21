@@ -92,7 +92,7 @@ export interface HandoffResult {
 }
 
 /**
- * Continue to Guided Selling: the handoff across the boundary (quote → approval → contract → e-signature → renewal).
+ * Continue to Quote Ready: the handoff across the boundary (quote → approval → contract → e-signature → renewal).
  * Assembles the full account/deal context, pushes it across, moves the lead
  * to Quoted and records the handoff (with its delivery outcome) on the
  * timeline. Returns where the user should be taken next.
@@ -230,10 +230,10 @@ export async function claimLeadAction(leadId: string) {
 export type PrepareResult = { ok: true } | { ok: false; missing: string[] };
 
 /**
- * "Continue to Guided Selling →": verify the minimum context exists, refresh the
+ * "Continue to Quote Ready →": verify the minimum context exists, refresh the
  * intelligence so the Quote Context is final, mark the opportunity Quote Ready
  * on the timeline, and let the client continue to the Quote Context review
- * (which pushes the structured context into Guided Selling).
+ * (which pushes the structured context into Quote Ready).
  */
 export async function prepareGuidedSellingAction(leadId: string): Promise<PrepareResult> {
   const { computeReadiness } = await import("@/lib/readiness");

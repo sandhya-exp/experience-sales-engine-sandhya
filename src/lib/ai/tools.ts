@@ -8,7 +8,7 @@ import { searchKnowledge, type RetrievedDoc, type SearchOptions } from "@/lib/ai
  * and every call is recorded in a trace that the UI shows under "AI Process".
  * All tools are READ-ONLY. Nothing in this file (or anything the orchestrator
  * calls) writes to the opportunity — status changes, qualification edits and
- * the Guided Selling handoff stay behind the explicit application actions a
+ * the Quote Ready handoff stay behind the explicit application actions a
  * person clicks in the workspace.
  */
 export interface OpportunityRecord {

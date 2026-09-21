@@ -42,7 +42,7 @@ export function QuoteHandoffConfirm({
             ? `Quote context handed to ${DOWNSTREAM.partner}.`
             : `Handoff recorded — ${DOWNSTREAM.partner} will pick it up when it is back online.`
         );
-        // The downstream module is embedded on the Guided Selling page, opened on this opportunity.
+        // The downstream module is embedded on the Quote Ready page, opened on this opportunity.
         router.push(`${DOWNSTREAM.route}?lead=${leadId}`);
         return;
       }

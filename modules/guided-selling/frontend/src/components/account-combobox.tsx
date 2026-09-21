@@ -23,9 +23,7 @@ export function AccountCombobox({
   const matches = useMemo(() => {
     const q = query.trim().toLowerCase()
     if (!q) return accounts
-    return accounts.filter((a) =>
-      [a.name, a.source_crm, a.contract_name].join(' ').toLowerCase().includes(q),
-    )
+    return accounts.filter((a) => a.name.toLowerCase().includes(q))
   }, [accounts, query])
 
   useEffect(() => {
@@ -52,7 +50,7 @@ export function AccountCombobox({
         <span className="min-w-0">
           <strong className="block truncate">{selected?.name ?? 'Select account'}</strong>
           <span className={cn('block truncate text-xs', light ? 'text-muted-foreground' : 'text-white/60')}>
-            {selected ? `${selected.source_crm} · ${selected.contract_name}` : `${accounts.length} accounts`}
+            {accounts.length} accounts
           </span>
         </span>
         <ChevronsUpDown className={cn('h-4 w-4 shrink-0', light ? 'text-muted-foreground' : 'text-white/70')} />
@@ -91,9 +89,6 @@ export function AccountCombobox({
                   <Check className={cn('mt-0.5 h-4 w-4 shrink-0', account.id === selectedId ? 'text-primary' : 'text-transparent')} />
                   <span className="min-w-0">
                     <strong className="block truncate">{account.name}</strong>
-                    <span className="block truncate text-xs text-muted-foreground">
-                      {account.source_crm} · {account.contract_name}
-                    </span>
                   </span>
                 </button>
               </li>

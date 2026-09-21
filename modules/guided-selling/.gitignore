@@ -2,7 +2,9 @@ generated/
 .venv/
 .tools/
 frontend/node_modules/
-frontend/dist/
+# frontend/dist is committed: the FastAPI app serves these prebuilt assets, and the
+# deployed service (Render) has no Node build step.
+!frontend/dist/
 frontend/*.tsbuildinfo
 __pycache__/
 *.pyc

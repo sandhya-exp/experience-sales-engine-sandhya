@@ -88,7 +88,7 @@ def write_executed_pdf(account: Account, signed_on: str) -> Path:
     rows = [
         ("Customer", customer.name),
         ("Source CRM", customer.source_crm),
-        ("Package", account.negotiation_summary.split(" · ")[0] if account.negotiation_summary else "Agreed package"),
+        ("Package", account.negotiation_summary.split(" · ")[0] if account.negotiation_summary else "Quoted plan"),
         ("Commercial terms", customer.contract.quote_amount),
         ("Initial term", f"{customer.contract.term_start.strftime('%d %b %Y')} to {customer.contract.term_end.strftime('%d %b %Y')}"),
         ("Customer signer", f"{signer.name} ({signer.role})"),
@@ -111,7 +111,7 @@ def write_executed_pdf(account: Account, signed_on: str) -> Path:
         0,
         5.5,
         _ascii(
-            f"{customer.name} is licensed to use the Experience.com platform for the agreed package "
+            f"{customer.name} is licensed to use the Experience.com platform for the quoted plan "
             f"during the initial twelve-month term. The commercial amount is "
             f"{customer.contract.quote_amount}. The agreement renews unless either party gives "
             "written notice thirty days before expiry."

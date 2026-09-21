@@ -12,13 +12,11 @@ import {
   Mail,
   PenLine,
   RefreshCw,
-  Sparkles,
 } from 'lucide-react'
 import { AccountCombobox } from './components/account-combobox'
 import { Badge } from './components/ui/badge'
 import { Button } from './components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from './components/ui/card'
-import { Input } from './components/ui/input'
 import {
   Dialog,
   DialogContent,
@@ -128,7 +126,7 @@ function LeadCard({ lead, act }: { lead: HandoffLead; act: (path: string, body: 
         <div className="flex items-start justify-between gap-3">
           <div>
             <h3 className="font-bold">{lead.company}</h3>
-            <p className="text-xs text-muted-foreground">{lead.source_crm} · {lead.quote_amount}</p>
+            <p className="text-xs text-muted-foreground">{lead.quote_amount}</p>
           </div>
           <StatusBadge status={lead.status} />
         </div>
@@ -186,7 +184,7 @@ function HomeView({ state, act }: ViewProps) {
           <table className="w-full min-w-[720px] text-left text-sm">
             <thead className="bg-muted text-xs uppercase tracking-wider text-muted-foreground">
               <tr>
-                {['Account', 'CRM', 'Agreement', 'Quote / term', 'Renewal'].map((h) => (
+                {['Account', 'Quote / term', 'Renewal'].map((h) => (
                   <th key={h} className="px-5 py-3">{h}</th>
                 ))}
               </tr>
@@ -208,8 +206,6 @@ function HomeView({ state, act }: ViewProps) {
                         <Badge className="ml-2" variant="default">open</Badge>
                       )}
                     </td>
-                    <td className="px-5 py-4">{account.source_crm}</td>
-                    <td className="px-5 py-4">{account.contract_name}</td>
                     <td className="px-5 py-4">{watch?.quote_amount ?? '—'}</td>
                     <td className="px-5 py-4">
                       <StatusBadge status={watch ? `${watch.status}${watch.days_until_expiry > 0 ? ` · ${watch.days_until_expiry}d` : ''}` : '—'} />
@@ -234,7 +230,7 @@ function HomeView({ state, act }: ViewProps) {
               <div key={lead.id} className="flex items-start justify-between gap-3 border-b pb-3 last:border-0">
                 <div>
                   <p className="font-semibold">{lead.company}</p>
-                  <p className="text-xs text-muted-foreground">{lead.source_crm} · {lead.quote_amount}</p>
+                  <p className="text-xs text-muted-foreground">{lead.quote_amount}</p>
                 </div>
                 <Button size="sm" onClick={() => act('/api/handoff/accept', { lead_id: lead.id })}>Accept</Button>
               </div>
@@ -252,7 +248,7 @@ function HomeView({ state, act }: ViewProps) {
               <div key={item.customer_id} className="flex items-center justify-between gap-3 border-b pb-3 last:border-0">
                 <div>
                   <p className="font-semibold">{item.name}</p>
-                  <p className="text-xs text-muted-foreground">{item.contract_name} · {item.days_until_expiry}d</p>
+                  <p className="text-xs text-muted-foreground">{item.days_until_expiry}d remaining</p>
                 </div>
                 <StatusBadge status={item.status} />
               </div>
@@ -298,10 +294,10 @@ function CustomerView({ state }: ViewProps) {
       <Card>
         <CardHeader><Eyebrow>Account structure</Eyebrow><CardTitle>One customer, many deals</CardTitle></CardHeader>
         <CardContent className="space-y-4 text-sm">
-          <section><strong>{c.name}</strong><p className="text-muted-foreground">{c.source_crm}</p></section>
+          <section><strong>{c.name}</strong></section>
           <section><Eyebrow>Contacts</Eyebrow>{c.contacts.map((p) => <p key={p.name}>{p.name} — {p.role}{p.is_signer && <Badge className="ml-2">signer</Badge>}</p>)}</section>
           <section><Eyebrow>Deals</Eyebrow>{c.deals.map((deal) => <p key={deal.id} className="flex justify-between">{deal.name}<StatusBadge status={deal.status} /></p>)}</section>
-          <section><Eyebrow>Contract</Eyebrow><p>{c.contract.name} · {c.contract.status}</p></section>
+          <section><Eyebrow>Contract</Eyebrow><p>{c.contract.status}</p></section>
         </CardContent>
       </Card>
       <Card>
@@ -320,19 +316,7 @@ function CustomerView({ state }: ViewProps) {
 
 function ContractView({ state, act }: ViewProps) {
   const c = state.customer
-  const [packageId, setPackageId] = useState(state.negotiation.selected_package_id)
-  const [concern, setConcern] = useState(state.negotiation.concern || 'none')
-  const [concession, setConcession] = useState(state.negotiation.concession_percent)
-  const negotiationLocked = state.contract_generated
-
-  function negotiate(action: 'propose' | 'finalize') {
-    act('/api/contract/negotiate', {
-      package_id: packageId,
-      concern,
-      concession_percent: concession,
-      action,
-    }, 'contract')
-  }
+  const quoted = state.contract_packages.find((item) => item.recommended) ?? state.contract_packages[0]
 
   return (
     <div className="space-y-5">
@@ -347,115 +331,36 @@ function ContractView({ state, act }: ViewProps) {
         ))}
       </div>
 
-      <Card>
-        <CardHeader>
-          <div className="flex flex-wrap items-start justify-between gap-3">
-            <div>
-              <Eyebrow>Commercial negotiation · {c.source_crm}</Eyebrow>
-              <CardTitle>Choose the offer before drafting</CardTitle>
-              <p className="mt-2 max-w-3xl text-sm leading-6 text-muted-foreground">
-                Packages are mapped to the originating CRM. Capture the customer’s concern,
-                review the suggested response, then finalize the terms that should flow into the contract.
-              </p>
-            </div>
-            <StatusBadge status={state.negotiation.status} />
-          </div>
-        </CardHeader>
-        <CardContent className="space-y-5">
-          <div className="grid gap-4 xl:grid-cols-3">
-            {state.contract_packages.map((item) => {
-              const selected = packageId === item.id
-              return (
-                <button
-                  type="button"
-                  key={item.id}
-                  disabled={negotiationLocked}
-                  onClick={() => setPackageId(item.id)}
-                  className={cn(
-                    'rounded-2xl border bg-white p-5 text-left transition hover:border-primary/60 disabled:cursor-not-allowed',
-                    selected && 'border-primary ring-2 ring-primary/15',
-                  )}
-                >
-                  <div className="flex items-start justify-between gap-2">
-                    <div>
-                      <h3 className="font-bold">{item.name}</h3>
-                      <p className="mt-1 text-lg font-bold text-primary">{item.display_price}</p>
-                    </div>
-                    {item.recommended && <Badge>Suggested</Badge>}
-                  </div>
-                  <p className="mt-3 text-xs leading-5 text-muted-foreground">{item.best_for}</p>
-                  <ul className="mt-4 space-y-2 text-sm text-[#33517f]">
-                    {item.features.map((feature) => (
-                      <li key={feature} className="flex gap-2">
-                        <span className="text-primary">✓</span>{feature}
-                      </li>
-                    ))}
-                  </ul>
-                </button>
-              )
-            })}
-          </div>
-
-          <div className="grid gap-4 rounded-2xl border bg-muted/60 p-5 lg:grid-cols-[1fr_180px]">
-            <label className="text-sm font-medium">
-              Customer concern
-              <select
-                value={concern}
-                disabled={negotiationLocked}
-                onChange={(event) => setConcern(event.target.value)}
-                className="mt-2 flex h-9 w-full rounded-lg border bg-white px-3 text-sm outline-none focus:ring-2 focus:ring-primary"
-              >
-                <option value="none">No stated concern</option>
-                <option value="budget">Budget / price</option>
-                <option value="implementation">Implementation timeline</option>
-                <option value="legal">Legal terms</option>
-                <option value="features">Feature fit</option>
-              </select>
-            </label>
-            <label className="text-sm font-medium">
-              Concession (0–15%)
-              <Input
-                className="mt-2"
-                type="number"
-                min={0}
-                max={15}
-                disabled={negotiationLocked}
-                value={concession}
-                onChange={(event) => setConcession(Math.max(0, Math.min(15, Number(event.target.value))))}
-              />
-            </label>
-          </div>
-
-          {state.negotiation.suggestion && (
-            <div className="rounded-2xl border border-primary/20 bg-primary/5 p-5">
-              <Eyebrow>AI commercial suggestion</Eyebrow>
-              <div className="flex gap-3">
-                <Sparkles className="mt-0.5 h-5 w-5 shrink-0 text-primary" />
+      {quoted && (
+        <Card>
+          <CardHeader>
+            <Eyebrow>Quoted plan</Eyebrow>
+            <CardTitle>{quoted.name}</CardTitle>
+            <p className="mt-2 max-w-3xl text-sm leading-6 text-muted-foreground">
+              This is the accepted quote. Commercial terms stay locked to this plan.
+            </p>
+          </CardHeader>
+          <CardContent>
+            <div className="rounded-2xl border border-primary/30 bg-white p-5">
+              <div className="flex flex-wrap items-start justify-between gap-3">
                 <div>
-                  <p className="text-sm leading-6">{state.negotiation.suggestion}</p>
-                  <p className="mt-3 font-semibold">
-                    Proposed total: {state.negotiation.final_price}
-                    {state.negotiation.concession_percent > 0 && (
-                      <span className="ml-2 text-xs font-normal text-muted-foreground">
-                        from {state.negotiation.list_price}
-                      </span>
-                    )}
-                  </p>
+                  <h3 className="font-bold">{quoted.name}</h3>
+                  <p className="mt-1 text-lg font-bold text-primary">{c.contract.quote_amount}</p>
                 </div>
+                <Badge>Quoted</Badge>
               </div>
+              <p className="mt-3 text-xs leading-5 text-muted-foreground">{quoted.best_for}</p>
+              <ul className="mt-4 space-y-2 text-sm text-[#33517f]">
+                {quoted.features.map((feature) => (
+                  <li key={feature} className="flex gap-2">
+                    <span className="text-primary">✓</span>{feature}
+                  </li>
+                ))}
+              </ul>
             </div>
-          )}
-
-          <div className="flex flex-wrap gap-2">
-            <Button variant="secondary" disabled={negotiationLocked} onClick={() => negotiate('propose')}>
-              Get recommendation
-            </Button>
-            <Button disabled={negotiationLocked} onClick={() => negotiate('finalize')}>
-              Finalize negotiated offer
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
+          </CardContent>
+        </Card>
+      )}
 
       <Card>
         <CardHeader>
@@ -468,13 +373,11 @@ function ContractView({ state, act }: ViewProps) {
         <CardContent>
           <div className="rounded-xl border bg-white p-6 text-sm leading-7 text-[#33517f]">
             {state.contract_generated
-              ? `This Agreement is entered into by Experience.com and ${c.name}, originating from ${c.source_crm}. Commercial terms: ${state.negotiation.selected_package_name} at ${c.contract.quote_amount}. Customer concern addressed: ${state.negotiation.concern_label}. The initial term is twelve months and renews unless notice is given thirty days before expiry.`
-              : state.negotiation.status === 'agreed'
-                ? `${state.negotiation.summary}. The commercial terms are agreed and ready to generate into ${c.contract.name}.`
-                : `No contract file yet. Finalize the package and concern response above before generating the agreement.`}
+              ? `This Agreement is entered into by Experience.com and ${c.name}. Commercial terms: ${state.negotiation.selected_package_name} at ${c.contract.quote_amount}. The initial term is twelve months and renews unless notice is given thirty days before expiry.`
+              : `No file yet. Generate the agreement from the accepted ${quoted?.name ?? 'quoted'} plan at ${c.contract.quote_amount}.`}
           </div>
           <div className="mt-4 flex gap-2">
-            <Button disabled={state.contract_generated || state.negotiation.status !== 'agreed'} onClick={() => act('/api/contract/generate', {})}>Generate contract</Button>
+            <Button disabled={state.contract_generated} onClick={() => act('/api/contract/generate', {})}>Generate contract</Button>
             <Button variant="secondary" disabled={!state.contract_generated || state.sign_index > 0} onClick={() => act('/api/contract/send', {}, 'signing')}>Send for signature</Button>
           </div>
         </CardContent>
@@ -660,7 +563,7 @@ function RenewalCard({ item, act }: { item: RenewalWatch; act: ViewProps['act'] 
     <Card>
       <CardContent className="p-5">
         <div className="flex items-start justify-between gap-3">
-          <div><h3 className="font-bold">{item.name}</h3><p className="text-xs text-muted-foreground">{item.source_crm} · {item.contract_name} · {item.quote_amount}</p></div>
+          <div><h3 className="font-bold">{item.name}</h3><p className="text-xs text-muted-foreground">{item.quote_amount}</p></div>
           <StatusBadge status={`${item.status}${item.days_until_expiry > 0 ? ` · ${item.days_until_expiry}d` : ''}`} />
         </div>
         <p className="my-3 text-sm">Signer: {item.signer}{item.signer_email && ` · ${item.signer_email}`}</p>
@@ -842,7 +745,7 @@ function App() {
                 />
               </div>
             )}
-            <Badge>{view === 'home' ? `Admin · ${state.customers.length} accounts` : view === 'handoff' ? `Inbox · ${queued} queued` : `Qualified · ${c.source_crm}`}</Badge>
+            <Badge>{view === 'home' ? `Admin · ${state.customers.length} accounts` : view === 'handoff' ? `Inbox · ${queued} queued` : c.name}</Badge>
             <Badge variant="warning">{view === 'home' ? `${queued} handoffs waiting` : view === 'handoff' ? 'CRM → Customer 360' : c.contract.quote_amount}</Badge>
           </div>
         </header>

@@ -34,7 +34,7 @@ class Contract(BaseModel):
     generated: bool = False
     term_start: date
     term_end: date
-    quote_amount: str = "₹4,80,000 / year"
+    quote_amount: str = "$48,000 / year"
 
 
 class Document(BaseModel):
@@ -90,7 +90,7 @@ class SelectAccountRequest(BaseModel):
     customer_id: str
 
 
-# "Experience.com" = a deal confirmed in the Lead & Deal Workspace (native intake, no external CRM).
+# "Experience.com" = an opportunity qualified in the Lead & Deal Workspace (native intake, no external CRM).
 CrmSource = Literal["Encompass", "BytePro", "Total Expert", "AgencyZoom", "Experience.com"]
 
 

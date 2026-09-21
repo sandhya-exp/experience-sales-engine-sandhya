@@ -52,33 +52,25 @@ AGREEMENT_BY_CRM = {
 
 PACKAGE_CATALOG = {
     "Total Expert": [
-        ("te-essential", "Essential", 360000, ["Reputation management", "Surveys", "Standard support"], "Teams starting with core customer experience"),
-        ("te-growth", "Growth", 480000, ["Reputation management", "Surveys", "Workflow automation", "Total Expert sync", "Priority support"], "Revenue teams needing CRM-connected workflows"),
-        ("te-enterprise", "Enterprise", 660000, ["Everything in Growth", "Advanced analytics", "Multi-brand controls", "Dedicated success manager", "Custom workflows"], "Large organizations with governance needs"),
+        ("te-essential", "Essential", 36000, ["Reputation management", "Surveys", "Standard support"], "Teams starting with core customer experience"),
+        ("te-growth", "Growth", 48000, ["Reputation management", "Surveys", "Workflow automation", "Total Expert sync", "Priority support"], "Revenue teams needing CRM-connected workflows"),
+        ("te-enterprise", "Enterprise", 66000, ["Everything in Growth", "Advanced analytics", "Multi-brand controls", "Dedicated success manager", "Custom workflows"], "Large organizations with governance needs"),
     ],
     "Encompass": [
-        ("enc-core", "Lending Core", 320000, ["Borrower surveys", "Review generation", "Encompass milestone sync"], "Mortgage teams beginning post-close automation"),
-        ("enc-growth", "Lending Growth", 450000, ["Everything in Core", "Branch dashboards", "Loan officer workflows", "Priority support"], "Multi-branch lenders focused on growth"),
-        ("enc-enterprise", "Lending Enterprise", 620000, ["Everything in Growth", "Enterprise analytics", "Custom Encompass events", "Dedicated success manager"], "Enterprise lenders with complex LOS operations"),
+        ("enc-core", "Lending Core", 32000, ["Borrower surveys", "Review generation", "Encompass milestone sync"], "Mortgage teams beginning post-close automation"),
+        ("enc-growth", "Lending Growth", 45000, ["Everything in Core", "Branch dashboards", "Loan officer workflows", "Priority support"], "Multi-branch lenders focused on growth"),
+        ("enc-enterprise", "Lending Enterprise", 62000, ["Everything in Growth", "Enterprise analytics", "Custom Encompass events", "Dedicated success manager"], "Enterprise lenders with complex LOS operations"),
     ],
     "BytePro": [
-        ("bp-core", "Core", 240000, ["Customer surveys", "Review requests", "BytePro sync"], "Independent mortgage teams"),
-        ("bp-growth", "Growth", 360000, ["Everything in Core", "Automated workflows", "Team analytics", "Priority support"], "Growing origination teams"),
-        ("bp-enterprise", "Enterprise", 520000, ["Everything in Growth", "Custom reporting", "Multi-entity controls", "Dedicated success manager"], "Large lenders"),
+        ("bp-core", "Core", 24000, ["Customer surveys", "Review requests", "BytePro sync"], "Independent mortgage teams"),
+        ("bp-growth", "Growth", 36000, ["Everything in Core", "Automated workflows", "Team analytics", "Priority support"], "Growing origination teams"),
+        ("bp-enterprise", "Enterprise", 52000, ["Everything in Growth", "Custom reporting", "Multi-entity controls", "Dedicated success manager"], "Large lenders"),
     ],
     "AgencyZoom": [
-        ("az-core", "Agency Core", 185000, ["Policyholder surveys", "Review requests", "AgencyZoom sync"], "Independent agencies"),
-        ("az-growth", "Agency Growth", 280000, ["Everything in Core", "Renewal workflows", "Producer analytics", "Priority support"], "Growing agencies"),
-        ("az-enterprise", "Agency Enterprise", 420000, ["Everything in Growth", "Multi-office controls", "Custom workflows", "Dedicated success manager"], "Agency groups"),
+        ("az-core", "Agency Core", 18500, ["Policyholder surveys", "Review requests", "AgencyZoom sync"], "Independent agencies"),
+        ("az-growth", "Agency Growth", 28000, ["Everything in Core", "Renewal workflows", "Producer analytics", "Priority support"], "Growing agencies"),
+        ("az-enterprise", "Agency Enterprise", 42000, ["Everything in Growth", "Multi-office controls", "Custom workflows", "Dedicated success manager"], "Agency groups"),
     ],
-}
-
-CONCERN_LABELS = {
-    "none": "No stated concern",
-    "budget": "Budget / price",
-    "implementation": "Implementation timeline",
-    "legal": "Legal terms",
-    "features": "Feature fit",
 }
 
 
@@ -129,24 +121,24 @@ def _band_label(band: Optional[str]) -> str:
     }.get(band or "", "")
 
 
-def _inr_year(n: int) -> str:
-    s = str(int(n))
-    if len(s) <= 3:
-        grouped = s
-    else:
-        grouped = s[-3:]
-        s = s[:-3]
-        while s:
-            grouped = s[-2:] + "," + grouped
-            s = s[:-2]
-    return f"₹{grouped} / year"
+def _usd_year(n: int) -> str:
+    return f"${int(n):,} / year"
+
+
+def _as_usd_quote(amount: str) -> str:
+    if "₹" not in amount and "Rs" not in amount:
+        return amount
+    value = _money_value(amount)
+    if value >= 100000:
+        value = round(value / 10)
+    return _usd_year(value)
 
 
 def _uplift(quote: str) -> str:
     digits = "".join(ch for ch in quote if ch.isdigit())
     if not digits:
         return quote
-    return _inr_year(round(int(digits) * 1.05))
+    return _usd_year(round(int(digits) * 1.05))
 
 
 def _money_value(amount: str) -> int:
@@ -164,7 +156,7 @@ def _packages(account: Account) -> list[ContractPackage]:
             id=package_id,
             name=name,
             annual_price=price,
-            display_price=_inr_year(price),
+            display_price=_usd_year(price),
             features=features,
             best_for=best_for,
             recommended=package_id == closest,
@@ -173,24 +165,38 @@ def _packages(account: Account) -> list[ContractPackage]:
     ]
 
 
-def _negotiation(account: Account) -> ContractNegotiation:
+def _quoted_package(account: Account) -> ContractPackage:
     packages = _packages(account)
-    selected = next(
-        (item for item in packages if item.id == account.selected_package_id),
-        next(item for item in packages if item.recommended),
-    )
-    discount = account.concession_percent
-    final_amount = round(selected.annual_price * (100 - discount) / 100)
+    return next(item for item in packages if item.recommended)
+
+
+def _lock_quoted_offer(account: Account) -> ContractPackage:
+    selected = _quoted_package(account)
+    account.selected_package_id = selected.id
+    account.concern = "none"
+    account.concession_percent = 0
+    account.negotiation_status = "agreed"
+    account.negotiation_suggestion = ""
+    account.negotiation_summary = f"{selected.name} · quoted {account.customer.contract.quote_amount}"
+    return selected
+
+
+def _negotiation(account: Account) -> ContractNegotiation:
+    selected = _quoted_package(account)
+    if not account.selected_package_id:
+        account.selected_package_id = selected.id
+    if not account.negotiation_summary:
+        account.negotiation_summary = f"{selected.name} · quoted {account.customer.contract.quote_amount}"
     return ContractNegotiation(
-        status=account.negotiation_status,
+        status="agreed",
         selected_package_id=selected.id,
         selected_package_name=selected.name,
-        concern=account.concern,
-        concern_label=CONCERN_LABELS.get(account.concern, ""),
-        concession_percent=discount,
+        concern="none",
+        concern_label="Quoted terms",
+        concession_percent=0,
         list_price=selected.display_price,
-        final_price=_inr_year(final_amount),
-        suggestion=account.negotiation_suggestion,
+        final_price=account.customer.contract.quote_amount,
+        suggestion="",
         summary=account.negotiation_summary,
     )
 
@@ -350,7 +356,7 @@ def _abc() -> Account:
                 name="Experience.com Agreement",
                 term_start=CONTRACT_START,
                 term_end=CONTRACT_END,
-                quote_amount="₹4,80,000 / year",
+                quote_amount="$48,000 / year",
             ),
             documents=[],
             activity=[
@@ -376,7 +382,7 @@ def _xyz() -> Account:
                 name="Encompass Agreement",
                 term_start=CONTRACT_START,
                 term_end=CONTRACT_END,
-                quote_amount="₹3,20,000 / year",
+                quote_amount="$32,000 / year",
             ),
             documents=[],
             activity=[
@@ -393,7 +399,7 @@ def _seed_inbox() -> list[HandoffLead]:
             id="te-abc",
             source_crm="Total Expert",
             company="ABC Corp",
-            quote_amount="₹4,80,000 / year",
+            quote_amount="$48,000 / year",
             status="accepted",
             why_qualified="Quote v2 accepted. Ops signer confirmed. Ready for Experience.com Agreement.",
             contacts=[
@@ -407,7 +413,7 @@ def _seed_inbox() -> list[HandoffLead]:
             id="enc-xyz",
             source_crm="Encompass",
             company="XYZ Corp",
-            quote_amount="₹3,20,000 / year",
+            quote_amount="$32,000 / year",
             status="accepted",
             why_qualified="LOS file complete. Lending head is signer. Map to Encompass Agreement.",
             contacts=[
@@ -421,7 +427,7 @@ def _seed_inbox() -> list[HandoffLead]:
             id="bp-pqr",
             source_crm="BytePro",
             company="PQR Lending",
-            quote_amount="₹2,40,000 / year",
+            quote_amount="$24,000 / year",
             why_qualified="Pipeline conversion > 40%. Quote v2 accepted in BytePro. Missing billing contact.",
             gaps=["No billing / AP contact on the file"],
             contacts=[
@@ -432,7 +438,7 @@ def _seed_inbox() -> list[HandoffLead]:
             id="az-lakeside",
             source_crm="AgencyZoom",
             company="Lakeside Insurance",
-            quote_amount="₹1,85,000 / year",
+            quote_amount="$18,500 / year",
             why_qualified="Agency book of 1,200 policies. Principal signed the quote in AgencyZoom.",
             contacts=[
                 Contact(name="Omar Sheikh", role="Principal", is_signer=True, email="omar@lakeside.example"),
@@ -443,7 +449,7 @@ def _seed_inbox() -> list[HandoffLead]:
             id="enc-northstar",
             source_crm="Encompass",
             company="Northstar Credit Union",
-            quote_amount="₹5,10,000 / year",
+            quote_amount="$51,000 / year",
             why_qualified="Encompass LOS deal won. Credit committee approved. Use Encompass Agreement, not a second Experience.com form.",
             gaps=["Order form not attached in CRM"],
             contacts=[
@@ -563,6 +569,7 @@ def _documents(account: Account, now: datetime) -> list[Document]:
 
 
 def _refresh(account: Account, now: datetime) -> Account:
+    account.customer.contract.quote_amount = _as_usd_quote(account.customer.contract.quote_amount)
     days = (account.customer.contract.term_end - now.date()).days
     account.days_until_expiry = days
     account.renewal_due = 0 < days <= 30 and not account.renewal_started and not account.snoozed
@@ -611,6 +618,8 @@ class Store:
     def snapshot(self) -> AppState:
         for account in self.accounts.values():
             _refresh(account, self.now)
+        for lead in self.inbox:
+            lead.quote_amount = _as_usd_quote(lead.quote_amount)
         acc = self._active()
         return AppState(
             now=self.now,
@@ -676,8 +685,7 @@ class Store:
     def generate_contract(self) -> AppState:
         acc = self._active()
         customer = acc.customer
-        if acc.negotiation_status != "agreed":
-            return self.snapshot()
+        selected = _lock_quoted_offer(acc)
         if not acc.contract_generated:
             acc.contract_generated = True
             customer.activity.insert(
@@ -685,9 +693,8 @@ class Store:
                 Activity(
                     at=_stamp(self.now),
                     text=(
-                        f"{customer.contract.name} generated from agreed "
-                        f"{_negotiation(acc).selected_package_name} offer at "
-                        f"{customer.contract.quote_amount}."
+                        f"{customer.contract.name} generated from quoted "
+                        f"{selected.name} plan at {customer.contract.quote_amount}."
                     ),
                 ),
             )
@@ -700,63 +707,8 @@ class Store:
         concession_percent: int,
         action: str,
     ) -> AppState:
-        acc = self._active()
-        if acc.contract_generated:
-            return self.snapshot()
-
-        packages = _packages(acc)
-        selected = next((item for item in packages if item.id == package_id), None)
-        if selected is None:
-            return self.snapshot()
-
-        acc.selected_package_id = package_id
-        acc.concern = concern
-        acc.concession_percent = max(0, min(concession_percent, 15))
-
-        suggestions = {
-            "budget": (
-                f"Keep {selected.name}; offer {acc.concession_percent or 5}% for annual prepay. "
-                "If price remains blocked, step down one package instead of removing support."
-            ),
-            "implementation": (
-                f"Propose a phased 30-day rollout for {selected.name}: CRM sync first, "
-                "then workflows and analytics, with weekly success check-ins."
-            ),
-            "legal": (
-                "Keep commercial scope unchanged. Route liability and data-processing redlines "
-                "to legal; offer a 24-month price lock instead of changing core protections."
-            ),
-            "features": (
-                f"Run a fit review against {selected.name}. Keep only features tied to the "
-                f"{acc.customer.source_crm} workflow and document excluded modules in the order form."
-            ),
-            "none": (
-                f"{selected.name} is the closest fit to the accepted quote. "
-                "Confirm scope, signer, and start date before generating the contract."
-            ),
-        }
-        acc.negotiation_suggestion = suggestions[concern]
-        final_amount = round(selected.annual_price * (100 - acc.concession_percent) / 100)
-        final_price = _inr_year(final_amount)
-        acc.negotiation_summary = (
-            f"{selected.name} · {CONCERN_LABELS[concern]} · "
-            f"{acc.concession_percent}% concession · {final_price}"
-        )
-        acc.negotiation_status = "agreed" if action == "finalize" else "proposed"
-
-        verb = "agreed" if action == "finalize" else "proposed"
-        acc.customer.activity.insert(
-            0,
-            Activity(
-                at=_stamp(self.now),
-                text=(
-                    f"Commercial terms {verb}: {selected.name}, {final_price}. "
-                    f"Concern: {CONCERN_LABELS[concern]}."
-                ),
-            ),
-        )
-        if action == "finalize":
-            acc.customer.contract.quote_amount = final_price
+        del package_id, concern, concession_percent, action
+        _lock_quoted_offer(self._active())
         return self.snapshot()
 
     def send_for_signature(self) -> AppState:

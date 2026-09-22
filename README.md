@@ -1,167 +1,168 @@
 # Experience Sales Engine — Lead & Deal Workspace
 
-The front half of the Experience.com Sales Engine lifecycle, built as a real working application:
+An independent, end-to-end Sales Engine build for the Experience.com SRP Build Intake competition: a customer-facing lead intake form feeding an internal sales workspace that carries a deal from first inquiry through qualification, quoting, negotiation and outcome — with an AI layer that reads the opportunity, reasons over it with tools, and drafts the next step instead of a bolt-on chatbot.
 
-**Customer Inquiry → Opportunity → Qualification → AI Opportunity Intelligence → Quote Context → Continue to Contract**
+```
+Customer Inquiry → Lead → Contacted → Qualified → Quote → Approval → Won / Lost
+```
 
-Two experiences in one app:
+This is my own, independently built implementation of the Lead & Deal Management portion of the Sales Engine. It does not include or depend on any other contributor's module.
 
-- **Customer-facing lead intake** at `/inquire` — a prospect submits company, contact, users, interest and requirements; a lead is created instantly.
-- **Internal Sales Engine workspace** at `/` (login required) — pipeline dashboard with stage counts, Needs Attention and Recent Activity; a per-lead workspace with Company info, Contacts, Activity timeline, Qualification, AI Opportunity Intelligence and Quote Readiness; and a **Continue to Contract** step that hands the quote context on for contracting (quote → approval → contract → e-signature → renewal).
+## Technology
 
-Stack: Next.js 16 (App Router) · React 19 · TypeScript · Tailwind CSS v4 · shadcn/ui-style components on Radix · PostgreSQL (Supabase-compatible).
+- **Next.js 16** (App Router, server components + server actions), **React 19**, **TypeScript**
+- **Tailwind CSS v4**, hand-built component library in the shadcn/ui style on top of **Radix UI** primitives
+- **PostgreSQL** via `pg` — no ORM, hand-written SQL, no separate query/API layer duplicating the app
+- **Claude (Anthropic)** for opportunity analysis, requirement extraction, next-action reasoning and quote-narrative drafting, called through a small typed client (`src/lib/ai/claude.ts`) with **deterministic, rule-based fallbacks** for every AI feature so the app is fully usable with no API key configured
+- A lexical (TF-IDF-style, tag-boosted) **retrieval** layer over an in-repo Sales Knowledge Base — grounding the AI in written playbook content, not a hosted vector database
+- **Google Calendar API** for live availability and real meeting creation
+- Plain **REST route handlers** (`src/app/api/**`) for the customer-facing intake and the read-only deal handoff
+- Zod for input validation, date-fns, sonner for toasts, bcryptjs for password hashing
+
+Nothing here is invented for the README: this is the actual dependency list in `package.json`, and it is deliberately short — no vector-database client, no FastAPI/Python service, no video-conferencing SDK.
 
 ## Run it locally
 
-Prerequisites: Node 20+, and PostgreSQL running locally (Postgres.app or `brew install postgresql@16` both work). Or point `DATABASE_URL` at a Supabase project instead — nothing in the code is Supabase-specific.
-
 ```bash
 npm install
-cp .env.example .env.local        # edit DATABASE_URL if your Postgres isn't postgres:postgres@localhost:5432
-createdb sales_engine             # once
-npm run db:setup                  # applies db/schema.sql (reading DATABASE_URL from .env.local), then seeds demo data
-npm run dev                       # http://localhost:3000
+cp .env.example .env.local        # set DATABASE_URL, and ANTHROPIC_API_KEY to enable live AI (optional)
+createdb sales_engine
+npm run db:setup                  # creates schema, then seeds demo data
+npm run dev
 ```
 
-Sign in as **sandhya@experience.com** / **demo1234** (Admin — the full lifecycle, including Ready to Contract), or as **sadhana@experience.com** / **demo1234** (Sales User — the lifecycle up to Scheduled Tasks).
+Visit `http://localhost:3000`.
 
-Re-run `npm run db:seed` at any time to reset to a clean demo state (5 companies across New / Contacted / Needs Attention / Quoted / Won).
+**Demo login:** `sandhya@experience.com` / `demo1234` (Admin — full access to every stage, every workspace and Reports).
 
-## Suggested demo path
+Optional Google Calendar setup for live availability and Meet-linked scheduling:
 
-1. Open `/inquire` and submit an inquiry as a customer.
-2. Sign in at `/login` — the new lead is at the top of the pipeline with an AI-suggested next action.
-3. Open it: log a call or note, fill in Qualification and set status to Qualified — the stage advances and **Continue to Contract** lights up.
-4. Watch **AI Opportunity Intelligence** and **Quote Readiness** update as qualification fills in; then **Continue to Contract →**.
-5. The Quote Context screen shows exactly what is handed over; continuing moves the opportunity to Ready to Contract and logs exactly what was handed over on the timeline.
-
-## AI Opportunity Intelligence
-
-The AI layer turns an unstructured customer inquiry into a grounded, validated, quote-ready opportunity. It is a small, bounded workflow (`src/lib/ai/orchestrator.ts`), not a chatbot and not a swarm of agents:
-
-```
-tools (read-only) ─► deterministic extraction (source of truth) ─► retrieval from the Sales Knowledge Base
-      ─► 1. Opportunity Analyst   (Claude · grounded in the record, every claim cites a source)
-      ─► 2. Solution Context      (Claude · grounded in the retrieved documents, every item cites a doc id)
-      ─► 3. Readiness / Evaluator (deterministic guardrail + Claude review)
-      ─► Opportunity Intelligence, saved on the lead ─► salesperson reviews ─► Continue to Contract →
+```bash
+npm run gcal:check     # verify service-account credentials are wired up
+npm run gcal:setup     # create the shared team calendar if it doesn't exist yet
 ```
 
-- **Tools** (`src/lib/ai/tools.ts`): `get_opportunity`, `get_contacts`, `get_activities`, `get_qualification`, `search_knowledge`. Every call is traced and shown in the UI. All read-only — the AI never changes a stage, a qualification field or triggers the handoff; those stay behind the buttons a person clicks.
-- **Sales Knowledge Base** (`src/lib/ai/knowledge/`): capability areas, integrations by industry, qualification guidance and quote-preparation rules, retrieved with a small explainable lexical retriever (`retrieval.ts`) so the AI can say *customer requires X → retrieved capability Y → consider Z when contracting*. No pricing, packages or tiers anywhere in it.
-- **Deterministic layer** (`intelligence.ts`, `readiness.ts`) decides the facts: extracted deployment/integrations, qualification gaps, quote context, readiness, and **contradictions** between the inquiry and qualification (user count, primary need, decision maker). Claude interprets and explains; it cannot add facts.
-- **Evaluator** removes anything that cites a source not on the record, cites a knowledge document that was not retrieved, contains a figure that appears nowhere in the record, or uses pricing/package language — and shows what it removed and why. Readiness for contracting is a ✓/⚠ checklist, never a vibe.
-- **One-look chain**: every brief opens with "How the AI got here" — *Customer says → Knowledge retrieved → AI identifies → Gap (with the question to ask) → Contract readiness → Next action*. The seeded **Meridian Home Loans** lead ("connect our loan origination system so 1,200 loan officers across 85 branches get a review request at closing") walks it end to end: *Mortgage & real-estate systems* and *Reputation Management* documents retrieved → LOS integration required, 1,200 users and 85 branches confirmed → gap "Which loan origination system are you using — Encompass, or another LOS?" → Not ready → "Confirm which loan origination system (LOS) Elena Ruiz uses before Ready to Contract".
-- **Output**: Customer Need · Evidence (sources used) · Relevant Product Context · Qualification Gaps (each with the question to ask) · AI check (potential conflicts) · Recommended Next Action · Quote Context · Contract Readiness, plus an expandable **AI process & evidence** panel with stages, tool calls, retrieved documents, record sources and the evaluator's conclusion. Process metadata only — never chain-of-thought.
-- **Mode indicator**: the card is labelled **Claude · <model>** or **Deterministic**. With `ANTHROPIC_API_KEY` set the Claude stages run server-side; without it, or if the API fails or returns invalid JSON, each stage falls back to its deterministic result and says so.
-- **Evals**: `npm run eval:ai` runs nine realistic opportunities (new, qualified, vague, conflicting, won, adversarial pricing request, enterprise HRIS chain, mortgage LOS chain…) and fails on any invented figure, pricing language, unresolvable citation, missed gap, missed contradiction or wrong readiness. `npm run eval:ai -- --claude` also runs them through Claude.
+Without Google Calendar configured, scheduling falls back to a clearly labeled local availability provider so the flow still works end to end.
 
-## The agent loop
+## 1. Product
 
-Intelligence tells a salesperson what is true. The agent layer does something about it, and it is the same pipeline with one more stage on the end:
+The Sales Engine covers the full front-to-mid lifecycle a deal actually goes through:
 
-```
-observe ─► understand ─► retrieve ─► decide ─► check readiness
-       ─► ACT: choose the action · band its risk · draft the message
-       ─► a person approves (or a green action runs on its own)
-       ─► the customer replies ─► extract ─► update ─► re-evaluate ─► next action
-```
+**Lead → Qualification → Opportunity → Quote → Negotiation/Requote → Approval → Won/Lost**
 
-- **Where it lives.** `src/lib/ai/act.ts` decides; `src/lib/ai/actions.ts` holds the five write tools and is the only place in the codebase where something other than a person's click changes an opportunity; `src/lib/ai/agent.ts` composes the loop. `orchestrator.ts` is untouched — deciding what is true and deciding what to do are separate stages and stay that way.
-- **Where an action is stored.** On the activity timeline, as an ordinary row with `metadata.kind = "agent_action"` (goal, rationale, evidence, risk, draft message, state, delivery, trace). No new table, and no way for the agent's work to drift from the account history.
-- **Risk bands.** **Green** — internal work and routine requests for a non-sensitive fact the customer already implied they would supply (which system, how many locations). Safe without a person. **Yellow** — anything needing interpretation or touching the relationship (decision maker, timeline, resolving a conflict). **Red** — commercial ground, budget included. Never automatic, whatever the caller asks: the rule is one function (`mayRunAutomatically`) checked at the point of execution, not at the button.
-- **Grounded messages.** The draft goes through the same guardrail as the brief (`src/lib/ai/guard.ts`, shared with the evaluator): a figure that is not in the record, a price, a commitment, or a system name nobody mentioned, and Claude's draft is discarded for the deterministic wording — and the card says so.
-- **Reading the reply.** Every extracted fact must carry a verbatim quote from the customer's message; a quote that is not in the reply is dropped before anything is written (`src/lib/ai/reply.ts`). So the CRM can only ever record what the customer actually said, and the workspace shows their own words beside each field it changed.
-- **Sending.** `src/lib/email/provider.ts` is a two-implementation boundary. Configured (`EMAIL_PROVIDER=resend` + key + from address) a message is really sent and reported as **Sent**; unconfigured, the development provider stores it and it is reported as **Recorded — not delivered**. "Sent" is reserved for a live provider that confirmed.
-- **Where it surfaces.** The Act tile on the chain and the Agent Action block in AI Intelligence; the AI actions card on Home (waiting for approval · safe to run · handled automatically · waiting for customer); agent rows in Scheduled Tasks; and AI preparation beside the week calendar, so a booked call arrives with its open questions already listed.
-- **Evals.** `npm run eval:agent` — 39 checks over action selection, risk banding, message grounding, hallucination rejection, reply extraction, re-evaluation, auto-send safety and the deterministic fallback. `-- --claude` runs the Claude paths too. The nine intelligence evals are unchanged and still pass.
+- **Lead intake** (`/inquire`) — a public form (company, contact, work email, phone, seat count, interest, requirements, optional additional info) that creates a lead directly in the pipeline; no separate "inbox" step.
+- **Pipeline** (`/pipeline`, and the Home dashboard) — every lead grouped by status (New, Contacted, Qualified, Quoted, Won, Lost), with search/filter and a single-stage focus view.
+- **Deal workspace** (`/leads/[id]`) — the central page for one company/deal: company + multiple contacts, qualification record, activity timeline, communication actions, quotes, and the AI Deal Brief, all in one place rather than split across separate screens.
+- **Activity & communication** — calls, emails, messages, notes and status changes are all first-class activity records with a full, chronological timeline.
+- **Scheduling** — a week-view calendar (`/schedule`) for discovery calls, booked against real availability.
+- **Quoting** — a CPQ-style line-item quote editor with discount rules, an approval chain, versioning/requoting, and an AI-drafted covering narrative.
+- **Reporting** (`/reports`) — pipeline, revenue, conversion and win/loss visibility computed live from the same activity data.
+- **Handoff to Contract** — a single "Create Quote" / "Continue to Contract" action and a read-only `/api/handoff/[leadId]` endpoint expose everything a downstream quote-to-contract system needs, without this codebase implementing contracts, e-signature, document storage or renewals itself.
 
-The seeded **BrightPath Realty** opportunity is the walkthrough: fully qualified, 9 checks with 8 passing, blocked only because the listing system was never named. The agent asks, the answer comes back "we use Bright MLS", and readiness, the gaps, the quote context and the next action all move on their own.
+## 2. AI / Agentic Architecture
 
-The header's primary action is **Continue to Contract →**: it verifies the minimum context, refreshes the intelligence so the Quote Context is final, marks the opportunity **Ready to Contract** on the timeline (auto-advancing New/Contacted to Qualified), and continues to the Quote Context screen, which shows exactly what is recorded. When information is missing the button becomes **Complete Qualification →** and jumps to the exact missing field. After pulling this change run `npm run db:schema` once (adds the `intelligence` column; idempotent).
+The AI here is not a textbox bolted onto a CRM. It's a grounded orchestration pipeline that reasons over one opportunity's actual record, backed by tools and a knowledge base, with mechanical guardrails checking every output before it's shown — and a deterministic fallback path for every single AI feature, so the product never depends on the model being available.
 
-## Where things live
+**Opportunity/Sales Agent orchestration** (`src/lib/ai/orchestrator.ts`) runs in stages for every Deal Brief:
 
-| Area | Path |
-|---|---|
-| Schema | `db/schema.sql` — `companies`, `contacts`, `leads`, `activities`, `ai_deal_briefs`, `app_users` |
-| Seed data | `db/seed.ts` |
-| Data access | `src/lib/db.ts` (one Postgres boundary) and `src/lib/repo/*` |
-| Server actions | `src/app/actions/*.ts` |
-| Talk to Sales (customer) | `src/app/inquire/`, `src/components/inquire/`, `src/lib/inquiry-schema.ts` |
-| Discovery-call booking | `src/lib/calendar/` (provider boundary, Google, local fallback, availability, booking), `src/app/api/availability/` |
-| Dashboard | `src/app/(app)/page.tsx`, `src/components/dashboard/` |
-| Lead workspace | `src/app/(app)/leads/[id]/`, `src/components/workspace/` |
-| Quote handoff | `src/app/(app)/leads/[id]/quote/page.tsx` |
-| AI workflow | `src/lib/ai/` — `orchestrator.ts`, `tools.ts`, `claude.ts`, `knowledge/`, `intelligence.ts`; evals in `evals/ai-intelligence/` |
+1. **Tools** (`src/lib/ai/tools.ts`) assemble the opportunity's actual CRM record — company, contacts, qualification answers, activity history — into a structured `OpportunityRecord`, with a full `ToolTrace` of what was pulled.
+2. **Deterministic extraction** pulls out hard facts (seat counts, stated interest, qualification fields) that don't need a model to find, so the AI layer is reasoning on top of known facts rather than re-deriving them.
+3. **Knowledge retrieval** (`src/lib/ai/knowledge/retrieval.ts`) — a lightweight, dependency-free lexical retriever (TF-IDF-style scoring with tag boosting) searches an in-repo Sales Knowledge Base of playbook content and returns the passages relevant to this specific opportunity, so the model is reasoning with retrieved context rather than from memory alone.
+4. **Opportunity Analyst** (Claude) reads the record, the extracted facts and the retrieved knowledge, and produces a structured summary of the customer's need.
+5. **Solution Context** (Claude) turns that summary into quote-relevant context — what's being asked for, what isn't yet answered.
+6. **Readiness / Evaluator** — a deterministic layer plus a Claude review pass checks the brief for missing qualification information and flags what's still needed before a quote can go out.
 
-## Team, ownership and coverage
+The output is a single **AI Deal Brief** per opportunity: a plain-language summary of the customer's requirement, what's missing, and a suggested next action — reasoning that's traceable back to real record data and retrieved knowledge, not a free-floating chat response.
 
-Every lead has an **Owner**. New inquiries are routed automatically (`src/lib/routing.ts`): the team member who covers that industry gets it ("Assigned to Sandhya (Dental specialist)" on the timeline); if nobody covers it, whoever has the fewest open deals does. Any team member can hand a deal to anyone else from the **Owner** control in the lead header, with an optional reason ("covering while Sandhya is on leave") — the change is logged so coverage is always visible. The sidebar's **Team** section filters the pipeline to *My leads*, a colleague's book, or *Unassigned*.
+**The agent loop** (`src/lib/ai/agent.ts`, deciding in `src/lib/ai/act.ts`, acting in `src/lib/ai/actions.ts`) goes one step further than analysis: it can propose and, within limits, take actions.
 
-Demo team (all password `demo1234`): sandhya@ (Admin), sadhana@ and marcus@experience.com (Sales User).
+- Every candidate action is assigned a risk band — **GREEN** actions (e.g. logging an internal note) may run automatically; **YELLOW/RED** actions (anything customer-facing) require a human to review and approve before anything goes out. `mayRunAutomatically` is the single gate this passes through.
+- **Grounding guardrail** (`src/lib/ai/guard.ts`) — shared by the agent's drafted messages and the quote narrative — mechanically rejects a draft that promises an outcome or timeline, invents a proper noun not present in the record, or uses a number that doesn't appear anywhere in the customer's own words or the CRM data. This runs after the model responds, independent of the prompt, so it can't be argued around by a bad completion.
+- **Reply extraction** (`src/lib/ai/reply.ts`) requires any quote the AI attributes to the customer to be a verbatim substring of what the customer actually wrote — no paraphrased "customer said" claims.
+- **Evidence-grounded reasoning**: every AI-facing feature is built on the same principle — say only what's in the record, and mechanically check that afterward rather than trusting the prompt.
+- **Deterministic fallback**: every AI surface (Deal Brief, agent actions, quote narrative) has a non-AI code path that runs whenever Claude isn't configured or a draft fails its guardrail check, so the app degrades to a rules-based version of the same feature rather than failing.
+- **AI evaluation tests** — two scripted eval suites run outside the UI: `npm run eval:ai` runs 9 realistic opportunity scenarios through the full orchestration pipeline, and `npm run eval:agent` runs 39 checks against the agent loop's action and message drafting.
+
+## 3. Automation
+
+- **Next-action recommendation** — every Deal Brief ends with a specific suggested next step, not just a summary.
+- **Customer response analysis** — the agent loop reads new customer communication and proposes a follow-up action grounded in what was actually said.
+- **SLA handling** (`src/lib/sla.ts`) — a two-stage, wall-clock-based rule: a lead with no response inside the configured window (`SLA_RESPOND_HOURS`) surfaces a reminder; past a second window (`SLA_REASSIGN_HOURS`) it's flagged for reassignment. It's a pure function evaluated over the timeline on read, not a background job.
+- **Scheduling against real availability** — the booking flow reads live Google Calendar availability (or a clearly labeled local fallback) so a rep can't double-book a slot.
+- **Quote / requote workflow** — sending a quote back for changes, and creating a new version, are both first-class actions that this system automates the bookkeeping for.
+- **Approval workflow** — a discount past a configured threshold routes automatically to a manager, and past a higher threshold to an admin as well; the app enforces this server-side, not just in the UI.
+- **Human approval before anything customer-facing** — every AI-drafted message, every AI-drafted quote narrative and every YELLOW/RED-risk agent action is a draft sitting in front of a person until they approve or edit it. Nothing AI-generated is sent without a human in the loop.
+
+## 4. Quote / Sales Workflow
+
+- **Line-item quote editor** — a CPQ-style editor (not a single "amount" field): per-line description, quantity, list unit price and line discount, with net unit price and net total computed live.
+- **Header-level commercial terms** — start date, contract term (months), an auto-derived end date, an additional (quote-level) discount, and tax.
+- **Discount / approval rules** (`src/lib/quotes/rules.ts`) — a two-tier chain: a line or quote past `QUOTE_DISCOUNT_APPROVAL_PCT` (default 15%) needs a manager; past `QUOTE_DISCOUNT_ADMIN_PCT` (default 25%) needs an admin as well, cumulative — the UI and the server agree on exactly the same numbers.
+- **Quote versioning / requoting** — a manager or admin can send a quote back with a note instead of approving it; the rep revises and resubmits, and every version is kept on the timeline.
+- **AI-generated quote narrative** (`src/lib/ai/narrative.ts`) — a short, second-person covering note drafted from the customer's stated requirement and the exact line items on the quote. It is only allowed to say three things — what the customer asked for, what's on the quote, and what happens next — and a mechanical check discards any draft that promises an outcome, mentions or justifies a discount, names something not in the record, or uses an invented figure. A deterministic version (assembled from the same record, no model) is always available and is what's shown if Claude isn't configured or a draft is rejected.
+- **Quote status and lifecycle** — draft, sent, changes-requested, approved/won, tracked per version.
+- **Audit / timeline history** — every quote creation, edit, change request and status change is recorded as an activity, visible on the same deal timeline as calls, emails and notes.
+
+## 5. Reporting
+
+`/reports` computes, live from the same `activities`/`leads` data every other page reads (no separate warehouse or modeled numbers):
+
+- Pipeline value and stage funnel
+- Revenue by month
+- Conversion / win-loss breakdown
+- Sales cycle time
+
+Reports render in-app and export via the browser's own print dialog (`/reports/print` + `window.print()`) rather than a server-side PDF library — no PDF-generation dependency in the codebase, so the README doesn't claim one.
+
+## 6. Scheduling
+
+- **Discovery-call booking** against real availability, shown as a week-view calendar (`/schedule`) with office-hours shading, an overdue/no-activity warning state, and a link from every booked slot straight into the deal workspace.
+- **Google Calendar integration** — when configured, availability is read live from Google Calendar and booking a call creates a real Google Calendar event with a real Google Meet link generated by the Calendar API (`conferenceData.createRequest`). A `LocalAvailabilityProvider` fallback (explicitly labeled as demo availability in the UI) is used when Google Calendar isn't configured, so scheduling still works end to end.
+- **Zoom / Microsoft Teams** — a rep can paste a Zoom or Teams meeting link when booking a call, and it's stored and shown on the event. This is not a live Zoom or Teams API integration — no meeting is created through either service — and this README does not claim otherwise.
+
+## 7. Where things live
+
+| Area | Route |
+| --- | --- |
+| Customer lead intake | `/inquire` |
+| Home / dashboard | `/` |
+| Pipeline (stage board) | `/pipeline` |
+| Deal workspace | `/leads/[id]` |
+| Quote line editor | `/leads/[id]/quote` |
+| Quotes overview | `/quotes` |
+| Companies | `/companies` |
+| Activity | `/activity` |
+| Schedule | `/schedule` |
+| Tasks | `/tasks` |
+| Reports | `/reports` (print view at `/reports/print`) |
+| Sign in | `/login` |
+
+API surface: `/api/inquiries` (lead intake), `/api/handoff/[leadId]` (read-only deal handoff), `/api/availability` and `/api/availability/rep` (scheduling), `/api/activity/recent`, `/api/notifications` and `/api/notifications/seen`.
 
 ## Roles and access
 
-Two roles, one boundary, held in `app_users.role`:
+Three roles (`src/lib/roles.ts`), enforced server-side (`src/lib/authz.ts`), not just hidden in the UI:
 
-| | Sales User | Admin |
-| --- | --- | --- |
-| Inquiries, pipeline, opportunity workspace, contacts, activity, qualification, AI Deal Brief, Scheduled Tasks | yes | yes |
-| Ready to Contract, the quote context review, the handoff API | no | yes |
-
-A Sales User owns the whole front half: they qualify the opportunity and the AI brief still tells them when qualification is complete — they simply do not perform the handover. Their nav ends at Scheduled Tasks, their Home has no contract card, and handoff to-dos do not appear on their list.
-
-The rule lives in one predicate (`canAccessContract`, `src/lib/roles.ts`) that both halves read, and it is **enforced on the server, not just in the UI** (`src/lib/authz.ts`): the pages redirect, the server actions refuse, the handoff API answers 403, and `src/proxy.ts` refuses the request before it reaches any of them. Typing the URL, replaying the action or curling the endpoint all get the same answer as the hidden button. The role is read from the database on each request, so changing someone's role takes effect immediately and no edited cookie can grant it.
-
-## Talk to Sales and discovery-call booking
-
-The customer-facing entry point is **Talk to Sales** (`/inquire`; `/talk-to-sales` redirects there). Required: company, full name, work email, phone, industry (select), number of users. Optional: what they're interested in, what they're looking to achieve, additional information. Phone is required because it is how the first contact attempt actually happens; the interest select is not, since many inquiries describe the need in their own words instead — when neither is given, the AI brief opens with that as the qualification gap. Every field is controlled and validated inline against the same zod schema the server uses (`src/lib/inquiry-schema.ts`) — an invalid email shows its message under the field and nothing else changes; no reload, no reset.
-
-On the confirmation page the customer can book a **discovery call** from the sales team's real availability:
-
-- `src/lib/calendar/` is the boundary. `GoogleCalendarProvider` reads free/busy for the configured rep calendars and creates the event through the Google Calendar API with a service account (plain REST, like Google sign-in). `LocalAvailabilityProvider` is the development fallback — business hours minus bookings already in this database — and is labelled **"Demo availability — Google Calendar not configured"** to the customer and the sales side. The app never claims Google is connected when it isn't.
-- Slots are the team's business hours (`SALES_TIMEZONE`, `SALES_HOURS`, `DISCOVERY_SLOT_MINUTES`) where at least `SALES_MIN_FREE_REPS` reps are free. The customer only ever sees times — never who is free or any event detail — shown in **their** time zone (detected in the browser) with the team's zone noted.
-- Booking re-verifies the slot against live free/busy, assigns the lead's owner if free (else the first free rep), creates the event with the customer and rep as attendees (`sendUpdates=all`), and stores the appointment on the opportunity as a follow-up with the calendar details (`metadata.calendar`: event id, link, rep, customer time zone, whether invitations went out). The workspace header, timeline and AI next action all read that follow-up.
-- Without domain-wide delegation Google refuses attendee lists from service accounts; the app then creates the event on the team calendar without attendees and tells the rep to send the invite.
-
-Configuration is in `.env.example` (service account key, `SALES_CALENDARS`, `GOOGLE_CALENDAR_IMPERSONATE`, `SALES_BOOKING_CALENDAR`).
-
-## Sign in
-
-Email + password only (`app_users`, bcrypt). There is no self-service sign-up and no third-party sign-in, so the only people who can get in are accounts an administrator created. Three roles — Sales Employee, Sales Manager, Admin (`src/lib/roles.ts`). Customers never sign in: they use `/inquire`.
-
-## Where leads come from
-
-- **Customer form** — `/inquire` (localhost:3000/inquire). The public page a prospect fills in; in production it is linked from the Experience.com website.
-- **Internal** — the **+ New Lead** button, for phone-in or manually captured inquiries.
-- **Other channels** — `POST /api/inquiries` with header `X-Inbound-Key: <INBOUND_API_KEY>`. Any system that captures interest — a website chat agent, a partner landing page, an automation — can create leads here. Body: `companyName, contactName, workEmail, phone?, numberOfUsers, interest, industry?, requirements, additionalInfo?, source?`. Replies `201 { leadId, companyId, companyMatched, leadUrl }`. Same de-dup and AI brief as the form; the timeline records the source (e.g. "Lead created from API (branvidia-chat)").
-
-All three ask for the prospect's **industry**, which the pipeline shows on each row and filters by from the sidebar.
+- **Sales Employee** — works leads end to end: contacts, activity, qualification, and drafts quotes for approval.
+- **Sales Manager** — everything a Sales Employee can do, plus approving and releasing quotes to the customer, and visibility across the team's pipeline and reports.
+- **Admin** — everything a manager can do, plus the contract handoff (Ready to Contract) and reassigning who a lead is owned by.
 
 ## The handoff
 
-This application owns the lifecycle up to **Ready to Contract**. Contracting
-itself — quote, approval, contract, e-signature, document storage, renewal — is
-a separate application and is deliberately not duplicated here.
-
-**Continue to Contract** on a qualified opportunity verifies the minimum
-context, refreshes the AI intelligence so the quote context is final, moves the
-opportunity to Ready to Contract and records exactly what was handed over on the
-timeline. Nothing else has to be running for that to work.
-
-The context itself is published as one read-only endpoint:
-
-```
-GET /api/handoff/{leadId}          # an Admin session, or X-Sales-Engine-Key: $HANDOFF_API_KEY
-```
-
-It returns the schema-2.0 payload — company, every contact, user count,
-interest, requirements, qualification and the AI insights — and no quote
-amount, package or discount: pricing belongs to whoever builds contracting, and
-the customer's budget travels as context only. Contract:
-**[docs/QUOTE_HANDOFF.md](docs/QUOTE_HANDOFF.md)**.
+The deal workspace's primary action is **Create Quote** (or **Open Quote**, once one exists) — a single, clearly-labeled entry point rather than this codebase reaching into contract, e-signature, document-storage or renewal territory. A read-only `GET /api/handoff/[leadId]` endpoint exposes the company, contacts, qualification record and quote data a downstream quote-to-contract system needs to pick the deal up, without this module owning or duplicating that functionality.
 
 ## Scope boundary
 
-This module owns everything from inquiry through the Ready to Contract handoff (Customer Inquiry → Opportunity → Qualification → AI Opportunity Intelligence → Quote Context). Package recommendation, quote versioning, pricing/discount rules, approvals, contracts, e-signature, document storage and renewals belong to the separate Quote/Contract application and are intentionally not duplicated here; the handoff screen is the integration point, and it passes company, all contacts, user count, interest, requirements and qualification so contracting can consume them.
+This build is Lead & Deal Management: intake, pipeline, qualification, activity, scheduling, AI deal intelligence, and quoting up through approval. It deliberately stops at the handoff — contract generation, e-signature, document storage and renewals are out of scope for this module and are not implemented here.
+
+## Suggested demo path
+
+1. Submit a lead at `/inquire` — company, contact, seat count, what you're interested in, and a couple of sentences of requirements.
+2. Open the new lead from the Pipeline or Home dashboard.
+3. Open the **AI Deal Brief** — see the summarized requirement, what's still missing, and the suggested next action, grounded in what was actually submitted.
+4. Log a call or note, then check the agent's suggested next action update in response.
+5. Move the lead to Qualified, filling in the qualification panel.
+6. Click **Create Quote** — build a line-item quote, apply a discount that crosses the manager threshold, and watch the approval requirement appear live.
+7. Draft the AI quote narrative, and see it grounded strictly in the requirement and the line items just entered.
+8. Submit the quote; sign in as a manager to approve it or send it back with a note for a new version.
+9. Move the deal to Won or Lost and check the timeline and Reports for the resulting activity.

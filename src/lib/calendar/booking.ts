@@ -21,12 +21,15 @@ export type BookingResult =
  * 4. Store the appointment on the opportunity as a follow-up with the calendar details,
  *    so the workspace header, timeline and AI next-action all see it.
  */
-export async function bookDiscoveryCall(input: { leadId: string; start: Date; customerTimeZone?: string | null }): Promise<BookingResult> {
+export async function bookDiscoveryCall(input: { leadId: string; start: Date; customerTimeZone?: string | null; minutes?: number }): Promise<BookingResult> {
   const lead = await getLeadById(input.leadId);
   if (!lead || lead.status !== "new") return { ok: false, reason: "lead_not_bookable" };
   if (await nextFollowUpFor(lead.id)) return { ok: false, reason: "already_booked" };
 
-  const cfg = schedulingConfig();
+  const base = schedulingConfig();
+  // The customer may have chosen a length other than the default; everything
+  // downstream — verification, the event, the stored appointment — uses it.
+  const cfg = input.minutes && input.minutes !== base.slotMinutes ? { ...base, slotMinutes: input.minutes } : base;
   const provider = await getCalendarProvider(cfg);
   const slot = await verifySlot(input.start, { cfg, provider });
   if (!slot) return { ok: false, reason: "slot_unavailable" };

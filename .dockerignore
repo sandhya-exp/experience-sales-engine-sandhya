@@ -4,8 +4,5 @@ node_modules
 .env
 .env.local
 .env.*.local
-modules/guided-selling/.venv
-modules/guided-selling/frontend/node_modules
-modules/guided-selling/**/__pycache__
 npm-debug.log*
 .DS_Store

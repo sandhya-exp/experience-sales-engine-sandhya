@@ -24,9 +24,14 @@ export function specialistsFor(industry: string | null): string[] {
 }
 
 export function pickOwner(team: TeamMember[], industry: string | null): { owner: TeamMember; reason: string } | null {
-  if (team.length === 0) return null;
-  const specialists = team.filter((m) => specialistsFor(industry).includes(m.email.toLowerCase()));
-  const pool = specialists.length > 0 ? specialists : team;
+  // Leads are carried by Sales Employees. A manager approves quotes and an
+  // admin runs the boundary; neither works a book, so neither is in the pool —
+  // unless nobody else exists, in which case someone is better than no one.
+  const carriers = team.filter((m) => m.role === "sales");
+  const eligible = carriers.length > 0 ? carriers : team;
+  if (eligible.length === 0) return null;
+  const specialists = eligible.filter((m) => specialistsFor(industry).includes(m.email.toLowerCase()));
+  const pool = specialists.length > 0 ? specialists : eligible;
   const owner = [...pool].sort((a, b) => a.open_leads - b.open_leads || a.name.localeCompare(b.name))[0];
   const reason = specialists.length > 0 ? `${industry} specialist` : "fewest open deals";
   return { owner, reason };

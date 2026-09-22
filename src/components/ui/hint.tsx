@@ -32,7 +32,7 @@ export const FIELD_HINTS: Record<string, string> = {
   deployment: "How the rollout is spread — number of locations, branches, clinics or teams, as stated by the customer.",
   decision_timeline: "When the customer expects to decide. Sets quote validity and urgency.",
   decision_maker: "The person with authority to approve the purchase and sign. Often not the person who submitted the inquiry — confirm on the first call.",
-  budget: "The range the customer has in mind. Passed to Quote Ready as context only; it never becomes the quote price.",
+  budget: "The range the customer has in mind. Passed on as context only; it never becomes the quote price.",
   current_solution: "What they use today (or nothing). Shows competitive position and migration effort.",
   integrations: "Systems the customer wants connected — CRM, LOS, practice-management, POS. Detected from their own words; confirm which ones on the call.",
   primary_contact: "The person we are talking to. Receives the quote unless a different decision maker is confirmed.",

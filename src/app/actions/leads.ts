@@ -17,10 +17,11 @@ import {
   ensureSeedOwnerAssigned,
   getLeadById,
 } from "@/lib/repo/leads";
-import { addContact, findOrCreateContactForInquiry } from "@/lib/repo/contacts";
+import { addContact, findOrCreateContactForInquiry, updateContact } from "@/lib/repo/contacts";
 import { findOrCreateCompanyForEmail } from "@/lib/repo/companies";
 import type { ActivityType, LeadStatus, Qualification, QualificationStatus } from "@/lib/types";
 import { getLeadContextOrThrow, regenerateBriefFor } from "@/lib/ai/service";
+import { refreshOpportunity } from "@/lib/ai/agent";
 
 async function actorName() {
   const user = await getCurrentUser();
@@ -49,9 +50,11 @@ export async function updateQualificationAction(leadId: string, formData: FormDa
   const name = await actorName();
   await updateQualificationRepo(leadId, qualification, qualificationStatus, name);
   // The brief's "missing information" and next step are derived from exactly
-  // these fields — refresh it so the Overview never shows stale gaps.
+  // these fields — refresh it so the Overview never shows stale gaps, and let
+  // the agent re-decide: filling a gap by hand should retire the action that
+  // existed to close it.
   try {
-    await regenerateBriefFor(await getLeadContextOrThrow(leadId));
+    await refreshOpportunity(leadId, { actorName: name });
   } catch (err) {
     console.error("Brief refresh after qualification save failed (non-fatal):", err);
   }
@@ -78,25 +81,47 @@ export async function addContactAction(leadId: string, companyId: string, formDa
   revalidatePath(`/leads/${leadId}`);
 }
 
+/**
+ * Edit a contact from the opportunity. Validated here rather than only in the
+ * dialog, because a server action is an endpoint whatever the form does.
+ */
+export async function updateContactAction(leadId: string, contactId: string, formData: FormData): Promise<{ ok: boolean; detail: string }> {
+  const name = String(formData.get("name") ?? "").trim();
+  const email = String(formData.get("email") ?? "").trim();
+  const title = (String(formData.get("title") ?? "").trim() || null) as string | null;
+  const phone = (String(formData.get("phone") ?? "").trim() || null) as string | null;
+  const makePrimary = formData.get("makePrimary") === "on";
+  if (!name) return { ok: false, detail: "A contact needs a name." };
+  if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) return { ok: false, detail: "Enter a valid email address." };
+  try {
+    await updateContact(contactId, { name, email, title, phone, makePrimary }, leadId, await actorName());
+  } catch (err) {
+    console.error("Contact update failed:", err);
+    return { ok: false, detail: "That change could not be saved." };
+  }
+  revalidatePath(`/leads/${leadId}`);
+  return { ok: true, detail: `${name} updated.` };
+}
+
 export async function regenerateBriefAction(leadId: string) {
-  const ctx = await getLeadContextOrThrow(leadId);
-  await regenerateBriefFor(ctx);
+  await refreshOpportunity(leadId, { actorName: await actorName() });
   revalidatePath(`/leads/${leadId}`);
   revalidatePath("/");
   revalidatePath("/pipeline");
 }
 
 export interface HandoffResult {
-  status: "delivered" | "pending" | "not_configured";
+  status: "recorded";
   url: string | null;
   detail: string;
 }
 
 /**
- * Continue to Quote Ready: the handoff across the boundary (quote → approval → contract → e-signature → renewal).
- * Assembles the full account/deal context, pushes it across, moves the lead
- * to Quoted and records the handoff (with its delivery outcome) on the
- * timeline. Returns where the user should be taken next.
+ * Continue to Contract: the handoff at the boundary of this workspace.
+ * Assembles the full account/deal context, moves the opportunity to Ready to
+ * Contract and records exactly what was handed over on the timeline. The
+ * context itself is readable at GET /api/handoff/{leadId} by whatever picks
+ * contracting up. Returns where the user should be taken next.
  */
 export async function createQuoteHandoffAction(leadId: string): Promise<HandoffResult> {
   // Admin only, checked here rather than only at the button: a server action is
@@ -127,10 +152,7 @@ export async function createQuoteHandoffAction(leadId: string): Promise<HandoffR
   await recordActivity({
     leadId,
     type: "note",
-    body:
-      delivery.status === "delivered"
-        ? `${resend ? "Updated quote context re-sent" : "Quote context handed"} to ${DOWNSTREAM.partner}: ${payload.contacts.length} contact${payload.contacts.length === 1 ? "" : "s"}, ${payload.sizing.users ?? "—"} users, qualification and ${payload.insights.length} insight${payload.insights.length === 1 ? "" : "s"}.`
-        : `Handoff to ${DOWNSTREAM.partner} recorded; it will load the quote context on open.`,
+    body: `${resend ? "Updated quote context recorded" : "Quote context recorded"} for ${DOWNSTREAM.partner}: ${payload.contacts.length} contact${payload.contacts.length === 1 ? "" : "s"}, ${payload.sizing.users ?? "—"} users, qualification and ${payload.insights.length} insight${payload.insights.length === 1 ? "" : "s"}.`,
     actorName: name,
     metadata: {
       handoff: {
@@ -200,8 +222,7 @@ export async function createManualLeadAction(
   });
   if (user) await ensureSeedOwnerAssigned(lead.id, user.id);
   try {
-    const ctx = await getLeadContextOrThrow(lead.id);
-    await regenerateBriefFor(ctx);
+    await refreshOpportunity(lead.id, { actorName: user?.name ?? "System" });
   } catch (err) {
     console.error("Initial AI brief generation failed (non-fatal):", err);
   }
@@ -234,10 +255,9 @@ export async function claimLeadAction(leadId: string) {
 export type PrepareResult = { ok: true } | { ok: false; missing: string[] };
 
 /**
- * "Continue to Quote Ready →": verify the minimum context exists, refresh the
- * intelligence so the Quote Context is final, mark the opportunity Quote Ready
- * on the timeline, and let the client continue to the Quote Context review
- * (which pushes the structured context into Quote Ready).
+ * "Continue to Contract →": verify the minimum context exists, refresh the
+ * intelligence so the Quote Context is final, mark the opportunity on the
+ * timeline, and let the client continue to the Quote Context review.
  */
 export async function prepareGuidedSellingAction(leadId: string): Promise<PrepareResult> {
   if (!(await assertContractAccess())) throw new Error("Not authorised to prepare this opportunity for Contract.");
@@ -256,7 +276,7 @@ export async function prepareGuidedSellingAction(leadId: string): Promise<Prepar
   await recordActivity({
     leadId,
     type: "note",
-    body: `Marked Quote Ready — quote context prepared for ${DOWNSTREAM.partner}.`,
+    body: `Marked ${DOWNSTREAM.name} — quote context prepared for ${DOWNSTREAM.partner}.`,
     actorUserId: user?.id,
     actorName: name,
     metadata: { kind: "quote_ready", brief_id: brief.id, quote_context: (brief.intelligence as { quote_context?: unknown }).quote_context ?? null },

@@ -9,6 +9,7 @@ export function WorkspaceTabs({
   contacts,
   activity,
   qualification,
+  quotes,
   brief,
 }: {
   defaultTab: string;
@@ -16,6 +17,7 @@ export function WorkspaceTabs({
   contacts: React.ReactNode;
   activity: React.ReactNode;
   qualification: React.ReactNode;
+  quotes: React.ReactNode;
   brief: React.ReactNode;
 }) {
   const router = useRouter();
@@ -33,12 +35,14 @@ export function WorkspaceTabs({
         <TabsTrigger value="contacts">Contacts</TabsTrigger>
         <TabsTrigger value="activity">Activity</TabsTrigger>
         <TabsTrigger value="qualification">Qualification</TabsTrigger>
+        <TabsTrigger value="quotes">Quotes</TabsTrigger>
         <TabsTrigger value="brief">AI Intelligence</TabsTrigger>
       </TabsList>
       <TabsContent value="overview">{overview}</TabsContent>
       <TabsContent value="contacts">{contacts}</TabsContent>
       <TabsContent value="activity">{activity}</TabsContent>
       <TabsContent value="qualification">{qualification}</TabsContent>
+      <TabsContent value="quotes">{quotes}</TabsContent>
       <TabsContent value="brief">{brief}</TabsContent>
     </Tabs>
   );

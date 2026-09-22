@@ -10,7 +10,7 @@
  *   - no commercial content: no prices, packages, tiers or discounts
  *   - grounded citations: every evidence source exists on the record, every KB citation was retrieved
  *   - correct gaps: the expected missing qualification is reported, and captured fields are not
- *   - correct readiness for Guided Selling
+ *   - correct readiness for the contract handoff
  *   - the expected knowledge documents were retrieved
  * Exits non-zero on any failure.
  */

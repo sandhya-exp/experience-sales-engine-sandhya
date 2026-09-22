@@ -5,11 +5,16 @@ import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth";
 import { scheduleFollowUp, completeFollowUp } from "@/lib/repo/followups";
 import { bookDiscoveryCall } from "@/lib/calendar/booking";
-import { getLeadContextOrThrow, regenerateBriefFor } from "@/lib/ai/service";
+import { isMeetingDuration } from "@/lib/calendar/recommend";
+import { refreshOpportunity } from "@/lib/ai/agent";
 
+/**
+ * A booking changes what the agent should do — a call two days out turns the
+ * next action into preparing for it — so the same refresh runs here.
+ */
 async function refreshBrief(leadId: string) {
   try {
-    await regenerateBriefFor(await getLeadContextOrThrow(leadId));
+    await refreshOpportunity(leadId);
   } catch (err) {
     console.error("Brief refresh after follow-up change failed (non-fatal):", err);
   }
@@ -31,9 +36,12 @@ function revalidateLead(leadId: string) {
 export async function bookCustomerSlotAction(leadId: string, formData: FormData) {
   const start = new Date(String(formData.get("slot") ?? ""));
   const timeZone = String(formData.get("timezone") ?? "") || null;
+  // Validated against the allowed set, never trusted as sent.
+  const rawMinutes = Number(formData.get("minutes"));
+  const minutes = isMeetingDuration(rawMinutes) ? rawMinutes : undefined;
   if (Number.isNaN(start.getTime())) redirect(`/inquire/thank-you?lead=${leadId}&error=slot`);
 
-  const result = await bookDiscoveryCall({ leadId, start, customerTimeZone: timeZone });
+  const result = await bookDiscoveryCall({ leadId, start, customerTimeZone: timeZone, minutes });
   if (!result.ok) {
     const code = result.reason === "slot_unavailable" ? "slot" : result.reason === "provider_error" ? "calendar" : "";
     redirect(`/inquire/thank-you?lead=${leadId}${code ? `&error=${code}` : ""}`);

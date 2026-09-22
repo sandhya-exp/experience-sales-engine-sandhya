@@ -419,7 +419,7 @@ function detectContradictions(lead: Lead, contacts: Contact[]): Contradiction[] 
       topic: "User count",
       a: { source: "inquiry", value: `${lead.number_of_users} users` },
       b: { source: "qualification", value: `${q.number_of_users} users` },
-      action: "Confirm the expected user count with the customer before Quote Ready — licence quantity depends on it.",
+      action: "Confirm the expected user count with the customer before contracting — licence quantity depends on it.",
     });
   }
   if (lead.interest && q.primary_need && lead.interest !== "Something else" && !overlapsLoose(lead.interest, q.primary_need)) {
@@ -436,7 +436,7 @@ function detectContradictions(lead: Lead, contacts: Contact[]): Contradiction[] 
       topic: "Decision maker",
       a: { source: "inquiry", value: signer },
       b: { source: "qualification", value: q.decision_maker },
-      action: "Confirm who actually approves and signs — the contract in Quote Ready goes to this person.",
+      action: "Confirm who actually approves and signs — the contract goes to this person.",
     });
   }
   const primary = contacts.find((c) => c.id === lead.primary_contact_id) ?? contacts.find((c) => c.is_primary);
@@ -559,8 +559,12 @@ function validateEvaluator(raw: unknown): EvaluatorResult {
   };
 }
 
-/** Commercial language this module must never produce. A customer's own stated budget figure is allowed (it is in the record). */
-const COMMERCIAL = /\b(price|pricing|priced|per[- ](?:user|seat)|packages?|tiers?|discounts?|quote amount|licen[cs]e fees?|list price|we (?:can )?offer)\b/i;
+/**
+ * Commercial language this module must never produce. A customer's own stated
+ * budget figure is allowed (it is in the record). Defined in `guard.ts` so the
+ * agent layer applies the identical rule to the messages it drafts.
+ */
+import { COMMERCIAL } from "@/lib/ai/guard";
 
 interface Evaluation {
   analyst: AnalystResult;
@@ -588,7 +592,7 @@ function deterministicEvaluate(args: { analyst: AnalystResult; solution: Product
     return nums.find((n) => !facts.numbers.has(n) && !kbNumbers.has(n)) ?? null;
   };
   const problem = (text: string): string | null => {
-    if (COMMERCIAL.test(text)) return "Mentions pricing, packages, tiers or discounts — decided in Quote Ready, not here.";
+    if (COMMERCIAL.test(text)) return "Mentions pricing, packages, tiers or discounts — decided when contracting, not here.";
     const n = unsupportedNumber(text);
     if (n) return `Contains the figure "${n}", which does not appear in the record.`;
     return null;

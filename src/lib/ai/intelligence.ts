@@ -136,7 +136,8 @@ export interface IntelligenceInput {
 }
 
 const SCOPE_NOUNS = "clinics?|offices?|locations?|branch(?:es)?|stores?|sites?|regions?|agents?|teams?|departments?|hospitals?|dealerships?|practices?|restaurants?|hotels?|properties";
-const INTEGRATION_NAMES = ["HubSpot", "Salesforce", "Zoho", "Pipedrive", "Encompass", "Dynamics", "Google Business", "Google My Business", "Yelp", "Zillow", "MLS", "Calyx", "Byte", "MeridianLink", "Blend", "Total Expert", "Slack", "Zapier", "Epic", "Cerner", "Dentrix", "Open Dental", "Toast", "Square", "Shopify", "Mindbody", "Workday", "BambooHR", "ADP", "SuccessFactors", "UKG", "Rippling", "Gusto", "Paycom", "NetSuite"];
+// Longer names first: when both "Bright MLS" and "MLS" match, the specific one wins.
+const INTEGRATION_NAMES = ["HubSpot", "Salesforce", "Zoho", "Pipedrive", "Encompass", "Dynamics", "Google Business", "Google My Business", "Yelp", "Zillow", "Bright MLS", "Stellar MLS", "CRMLS", "Paragon MLS", "Matrix MLS", "MoxiWorks", "MLS", "Calyx", "Byte", "MeridianLink", "Blend", "Total Expert", "Slack", "Zapier", "Epic", "Cerner", "Dentrix", "Open Dental", "Toast", "Square", "Shopify", "Mindbody", "Workday", "BambooHR", "ADP", "SuccessFactors", "UKG", "Rippling", "Gusto", "Paycom", "NetSuite"];
 
 /** Words that tell us the customer expects an integration even when no system is named. */
 export const INTEGRATION_MENTION = /\b(integrat\w*|sync\w*|api|crm|connect\w*|hris|hr system|hr platform|payroll system|erp|point[- ]of[- ]sale|pos system|practice[- ]management|ehr|emr|loan[- ]origination(?: system)?|los)\b/i;
@@ -294,7 +295,10 @@ function extractDeployment(text: string): string | null {
 }
 
 function extractIntegrations(text: string): string[] {
-  return INTEGRATION_NAMES.filter((n) => new RegExp(`\\b${n.replace(/\s+/g, "\\s+")}\\b`, "i").test(text));
+  const hits = INTEGRATION_NAMES.filter((n) => new RegExp(`\\b${n.replace(/\s+/g, "\\s+")}\\b`, "i").test(text));
+  // "Bright MLS" also matches "MLS"; report the system the customer actually
+  // named, not the generic word inside it.
+  return hits.filter((n) => !hits.some((other) => other !== n && other.toLowerCase().includes(n.toLowerCase())));
 }
 
 function splitRequirements(text: string): string[] {

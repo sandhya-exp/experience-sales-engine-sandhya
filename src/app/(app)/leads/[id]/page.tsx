@@ -9,8 +9,15 @@ import { QualificationTab } from "@/components/workspace/qualification-tab";
 import { AiBriefTab } from "@/components/workspace/ai-brief-tab";
 import { nextFollowUpFor } from "@/lib/repo/followups";
 import { listTeam } from "@/lib/repo/users";
-import { hasContractAccess } from "@/lib/authz";
-import { hasIntelligence } from "@/components/workspace/ai-brief-card";
+import { hasContractAccess, hasQuoteApproval } from "@/lib/authz";
+import { hasIntelligence } from "@/lib/ai/briefGuards";
+import { currentAgentActionFor, latestCustomerReply } from "@/lib/repo/agentActions";
+import { listBriefHistory } from "@/lib/repo/aiBriefs";
+import { listQuotesForLead, activeQuote, formatMoney } from "@/lib/repo/quotes";
+import { QuotesTab } from "@/components/workspace/quotes-tab";
+import { NextStepBanner } from "@/components/workspace/next-step-banner";
+import { autoModeFor } from "@/lib/ai/actions";
+import { emailProvider } from "@/lib/email/provider";
 
 export default async function LeadWorkspacePage({ params, searchParams }: PageProps<"/leads/[id]">) {
   const { id } = await params;
@@ -22,7 +29,20 @@ export default async function LeadWorkspacePage({ params, searchParams }: PagePr
   if (!data) notFound();
 
   const { lead, company, contacts, activities, brief, ownerName } = data;
-  const [followUp, team, canContract] = await Promise.all([nextFollowUpFor(lead.id), listTeam(), hasContractAccess()]);
+  const [followUp, team, canContract, canApprove, agentAction, autoMode, lastReply, briefHistory, quotes] = await Promise.all([
+    nextFollowUpFor(lead.id),
+    listTeam(),
+    hasContractAccess(),
+    hasQuoteApproval(),
+    currentAgentActionFor(lead.id),
+    autoModeFor(lead.id),
+    latestCustomerReply(lead.id),
+    listBriefHistory(lead.id),
+    listQuotesForLead(lead.id),
+  ]);
+  const quote = activeQuote(quotes);
+  const provider = emailProvider();
+  const providerLabel = provider.mode === "live" ? `Sending via ${provider.name}` : "Development provider — messages are recorded, not delivered";
   const focusField = hasIntelligence(brief) ? (brief.intelligence.next_action.field ?? brief.intelligence.gaps.missing.find((m) => m.field)?.field ?? null) : null;
 
   return (
@@ -36,15 +56,32 @@ export default async function LeadWorkspacePage({ params, searchParams }: PagePr
         contacts={contacts}
         focusField={focusField}
         canContract={canContract}
+        quote={quote}
       />
+      {/* The conclusion, above the tabs: what to do next, with a link to why. */}
+      <div className="px-6 pt-5">
+        <NextStepBanner leadId={lead.id} brief={brief} action={agentAction} />
+      </div>
       <div className="mx-auto max-w-6xl px-6 py-6">
         <WorkspaceTabs
           defaultTab={tab}
           overview={<OverviewTab lead={lead} company={company} brief={brief} contacts={contacts} activities={activities} />}
           contacts={<ContactsTab leadId={lead.id} companyId={company.id} contacts={contacts} />}
-          activity={<ActivityTab leadId={lead.id} activities={activities} />}
+          activity={<ActivityTab leadId={lead.id} activities={activities} briefs={briefHistory} quotes={quotes} leadCreatedAt={lead.created_at} companyName={company.name} />}
           qualification={<QualificationTab lead={lead} contacts={contacts} focus={focus} />}
-          brief={<AiBriefTab leadId={lead.id} brief={brief} canContract={canContract} />}
+          quotes={<QuotesTab leadId={lead.id} lead={lead} company={company} quotes={quotes} isAdmin={canApprove} />}
+          brief={
+            <AiBriefTab
+              leadId={lead.id}
+              brief={brief}
+              canContract={canContract}
+              action={agentAction}
+              autoMode={autoMode}
+              providerLabel={providerLabel}
+              lastReply={lastReply}
+              quote={quote ? { version: quote.meta.version, status: quote.meta.status, total: formatMoney(quote.meta.total) } : null}
+            />
+          }
         />
       </div>
     </div>

@@ -24,8 +24,10 @@ create table if not exists app_users (
   name text not null,
   email text not null unique,
   password_hash text not null,
-  -- 'sales' works the lifecycle up to Scheduled Tasks; 'admin' additionally
-  -- has Ready to Contract and the handoff. Least privilege by default.
+  -- 'sales' (Sales Employee) works the lifecycle and drafts quotes; 'manager'
+  -- additionally approves and sends them and sees the team's reports; 'admin'
+  -- additionally has Ready to Contract, the handoff and lead reassignment.
+  -- Least privilege by default. See src/lib/roles.ts.
   role text not null default 'sales',
   created_at timestamptz not null default now()
 );
@@ -33,11 +35,16 @@ create table if not exists app_users (
 -- Idempotent for databases created before the role existed.
 alter table app_users add column if not exists role text not null default 'sales';
 
+-- Role set widened to include 'manager'. Dropped and re-added rather than
+-- created-if-absent so a database built before the manager role existed picks
+-- up the new set on the next `npm run db:schema`. No data changes: every
+-- existing value is still permitted.
 do $$
 begin
-  if not exists (select 1 from pg_constraint where conname = 'app_users_role_check') then
-    alter table app_users add constraint app_users_role_check check (role in ('admin', 'sales'));
+  if exists (select 1 from pg_constraint where conname = 'app_users_role_check') then
+    alter table app_users drop constraint app_users_role_check;
   end if;
+  alter table app_users add constraint app_users_role_check check (role in ('admin', 'manager', 'sales'));
 end $$;
 
 create table if not exists companies (

@@ -47,11 +47,33 @@ export async function getCalendarProvider(cfg = schedulingConfig()): Promise<Cal
  * business hours, `slotMinutes` long, at least `minFreeReps` reps free, not
  * sooner than `minNoticeHours` from now.
  */
-export async function computeAvailability(opts: { now?: Date; cfg?: SchedulingConfig; provider?: CalendarProvider } = {}): Promise<Availability> {
-  const cfg = opts.cfg ?? schedulingConfig();
+export async function computeAvailability(
+  opts: {
+    now?: Date;
+    cfg?: SchedulingConfig;
+    provider?: CalendarProvider;
+    /**
+     * Meeting length, when the customer picked one other than the configured
+     * default. The grid steps by this, so a 60-minute call is offered on the
+     * hour and free/busy is checked across the whole hour — a slot is only
+     * offered if the reps are free for the length actually being booked.
+     */
+    minutes?: number;
+    /**
+     * Restrict availability to specific calendars — used when a rep is booking
+     * on their own behalf, where "is the team free" is the wrong question and
+     * "is *this* salesperson free" is the right one.
+     */
+    onlyCalendars?: string[];
+  } = {}
+): Promise<Availability> {
+  const base = opts.cfg ?? schedulingConfig();
+  const cfg = opts.minutes && opts.minutes !== base.slotMinutes ? { ...base, slotMinutes: opts.minutes } : base;
   const now = opts.now ?? new Date();
   const provider = opts.provider ?? (await getCalendarProvider(cfg));
-  const calendars = provider.describe().calendars;
+  const all = provider.describe().calendars;
+  const wanted = opts.onlyCalendars?.map((c) => c.toLowerCase()) ?? null;
+  const calendars = wanted ? all.filter((c) => wanted.includes(c.toLowerCase())) : all;
 
   // Window: from now to the end of the last offered business day.
   const days = businessDays(now, cfg, cfg.bookingDays);
@@ -79,8 +101,11 @@ export async function computeAvailability(opts: { now?: Date; cfg?: SchedulingCo
 }
 
 /** Is this exact slot still bookable right now? Returns the free reps or null. */
-export async function verifySlot(start: Date, opts: { cfg?: SchedulingConfig; provider?: CalendarProvider } = {}): Promise<Slot | null> {
-  const cfg = opts.cfg ?? schedulingConfig();
+export async function verifySlot(start: Date, opts: { cfg?: SchedulingConfig; provider?: CalendarProvider; minutes?: number } = {}): Promise<Slot | null> {
+  const base = opts.cfg ?? schedulingConfig();
+  // Verify against the length actually being booked, not the default — a 60
+  // minute call must be free for 60 minutes.
+  const cfg = opts.minutes && opts.minutes !== base.slotMinutes ? { ...base, slotMinutes: opts.minutes } : base;
   const provider = opts.provider ?? (await getCalendarProvider(cfg));
   const calendars = provider.describe().calendars;
   const end = new Date(start.getTime() + cfg.slotMinutes * 60_000);

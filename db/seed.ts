@@ -22,7 +22,8 @@ function nextBusinessDayAt(hour: number, minute: number) {
   while (d.getDay() === 0 || d.getDay() === 6) d = new Date(d.getTime() + 24 * 60 * 60 * 1000);
   return d;
 }
-import { getLeadContextOrThrow, regenerateBriefFor } from "@/lib/ai/service";
+import { refreshOpportunity } from "@/lib/ai/agent";
+import { seedHistoricalDeals } from "./history";
 
 async function main() {
   const pool = getPool();
@@ -38,15 +39,19 @@ async function main() {
   );
   const ownerId = userRows[0].id as string;
 
-  // Two teammates, so ownership, coverage and sector routing have somewhere to go.
+  // Three teammates, so ownership, coverage, sector routing and the approval
+  // chain all have somewhere to go: two Sales Employees who draft quotes, and a
+  // Sales Manager who approves and releases them.
   const { rows: teamRows } = await pool.query(
     `insert into app_users (name, email, password_hash, role) values
        ('Sadhana', 'sadhana@experience.com', $1, 'sales'),
-       ('Marcus Lee', 'marcus@experience.com', $1, 'sales')
+       ('Marcus Lee', 'marcus@experience.com', $1, 'sales'),
+       ('Meera Shah', 'meera@experience.com', $1, 'manager')
      returning id, email`,
     [passwordHash]
   );
   const sadhanaId = teamRows.find((r: { email: string }) => r.email === "sadhana@experience.com")!.id as string;
+  const marcusId = teamRows.find((r: { email: string }) => r.email === "marcus@experience.com")!.id as string;
 
   // --- Acme Corporation: fully qualified, ready for the demo's happy path ---
   const acme = await findOrCreateCompanyForEmail("Acme Corporation", "john@acme.com", "Insurance");
@@ -93,7 +98,7 @@ async function main() {
     "in_progress",
     "Sandhya"
   );
-  await regenerateBriefFor(await getLeadContextOrThrow(acmeLead.id));
+  await refreshOpportunity(acmeLead.id);
 
   // --- FinEdge Solutions: new, needs first contact ---
   const finEdge = await findOrCreateCompanyForEmail("FinEdge Solutions", "sarah.thomas@finedge.io", "Financial Services");
@@ -116,7 +121,7 @@ async function main() {
     actorName: "Sarah Thomas",
     source: "customer",
   });
-  await regenerateBriefFor(await getLeadContextOrThrow(finEdgeLead.id));
+  await refreshOpportunity(finEdgeLead.id);
 
   // --- Meridian Home Loans: the mortgage chain (retrieval → reasoning → gap → readiness) ---
   const meridian = await findOrCreateCompanyForEmail("Meridian Home Loans", "elena.ruiz@meridianhomeloans.com", "Mortgage");
@@ -146,7 +151,7 @@ async function main() {
     "Sandhya"
   );
   await addContact(meridian.company.id, { name: "Daniel Osei", email: "daniel.osei@meridianhomeloans.com", title: "CFO" }, meridianLead.id, "Sandhya");
-  await regenerateBriefFor(await getLeadContextOrThrow(meridianLead.id));
+  await refreshOpportunity(meridianLead.id);
 
   // --- Nova Insurance: stalled, needs attention ---
   const nova = await findOrCreateCompanyForEmail("Nova Insurance", "alex.brown@novainsurance.com", "Insurance");
@@ -175,7 +180,7 @@ async function main() {
     actorName: "Sandhya",
     source: "rep",
   });
-  await regenerateBriefFor(await getLeadContextOrThrow(novaLead.id));
+  await refreshOpportunity(novaLead.id);
   // Backdate this lead's activity so it shows up under "Needs Attention"
   await pool.query(
     "update activities set occurred_at = now() - interval '4 days' where lead_id = $1",
@@ -190,9 +195,10 @@ async function main() {
     primaryContactId: brightContact.id,
     numberOfUsers: 60,
     interest: "Online Listings",
-    requirements: "Want to sync listing data and manage reviews for 12 agents.",
+    requirements:
+      "We need our listing data to sync automatically and one place to manage reviews for our 12 agents. Listings are tracked in spreadsheets today and reviews are going unanswered.",
   });
-  await ensureSeedOwnerAssigned(brightLead.id, sadhanaId);
+  await ensureSeedOwnerAssigned(brightLead.id, ownerId);
   await recordActivity({
     leadId: brightLead.id,
     type: "call",
@@ -219,8 +225,11 @@ async function main() {
     "qualified",
     "Sandhya"
   );
-  await regenerateBriefFor(await getLeadContextOrThrow(brightLead.id));
-  await updateLeadStatus(brightLead.id, "quoted", "Sandhya");
+  // Deliberately left at Qualified with the listing system unnamed: every
+  // qualification field is captured, so the only thing standing between this
+  // opportunity and contracting is the integration the customer never named.
+  // That is what the agent notices, asks about, and closes.
+  await refreshOpportunity(brightLead.id);
 
   const summitCare = await findOrCreateCompanyForEmail("Summit Care Clinics", "priya@summitcare.health", "Healthcare");
   const summitContact = await createPrimaryContact(summitCare.company.id, "Priya Patel", "priya@summitcare.health");
@@ -278,7 +287,7 @@ async function main() {
     actorName: "Sandhya",
   });
   await updateLeadStatus(summitLead.id, "won", "Sandhya");
-  await regenerateBriefFor(await getLeadContextOrThrow(summitLead.id));
+  await refreshOpportunity(summitLead.id);
 
   // Spread activity across the past few weeks so the pipeline and the Recent
   // Activity feed read like real work, not a single instant. Each lead's
@@ -308,6 +317,14 @@ async function main() {
   await backdate(finEdgeLead.id, 0, 0);
   await backdate(novaLead.id, 4, 4); // exactly 4 days stale: the "Needs Attention" example
   await backdate(meridianLead.id, 2, 1);
+
+  // The live six above are the demo you click through. This is the year behind
+  // them: closed wins and losses, quotes that landed and quotes that expired,
+  // so revenue, win rate, average deal size, quote conversion and sales-cycle
+  // length are readings of real rows rather than empty panels.
+  console.log("Seeding twelve months of closed history...");
+  const history = await seedHistoricalDeals(pool, [ownerId, sadhanaId, marcusId]);
+  console.log(`  ${history.leads} historical opportunities · ${history.quotes} quotes · ${history.won} won · ${history.lost} lost`);
 
   console.log("Seed complete.");
   await pool.end();

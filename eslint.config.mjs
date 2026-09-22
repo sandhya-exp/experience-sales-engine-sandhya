@@ -13,7 +13,6 @@ const eslintConfig = defineConfig([
     "build/**",
     "next-env.d.ts",
     // Contracts module (FastAPI + Vite app) has its own toolchain.
-    "modules/**",
   ]),
 ]);
 

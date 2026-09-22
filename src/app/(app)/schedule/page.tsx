@@ -5,6 +5,14 @@ import { calendarStatus, type CalendarStatus } from "@/lib/calendar/status";
 import { schedulingConfig } from "@/lib/calendar/config";
 import { addDays, formatInZone, zonedParts, zonedToUtc } from "@/lib/calendar/time";
 import { WeekGrid, type PlacedMeeting, type WeekDay } from "@/components/schedule/week-grid";
+import { CallPreparation, type CallPrepRow } from "@/components/schedule/call-prep";
+import { NewScheduleDialog, type SchedulableLead } from "@/components/schedule/new-schedule-dialog";
+import { listLeadRows } from "@/lib/repo/leads";
+import { listUpcomingMeetings } from "@/lib/repo/schedule";
+import { listOpenAgentActions } from "@/lib/repo/agentActions";
+import { listLatestBriefs } from "@/lib/repo/aiBriefs";
+import { hasIntelligence } from "@/lib/ai/briefGuards";
+import { openQuestions } from "@/lib/ai/act";
 import { cn } from "@/lib/utils";
 
 /**
@@ -45,7 +53,36 @@ export default async function SchedulePage({ searchParams }: PageProps<"/schedul
   const nextMonday = addDays(monday.year, monday.month, monday.day, 7);
   const weekEnd = zonedToUtc(nextMonday.year, nextMonday.month, nextMonday.day, 0, 0, tz);
   const meetings = await listMeetingsBetween(weekStart, weekEnd);
-  const status = await calendarStatus();
+  const [status, upcoming, agentActions, briefs] = await Promise.all([calendarStatus(), listUpcomingMeetings(10), listOpenAgentActions(), listLatestBriefs()]);
+
+  // What the agent has, or could have, prepared for each call that is still
+  // ahead. The open questions are the same ones the brief reports — a call is
+  // the cheapest place to close them.
+  const briefByLead = new Map(briefs.map((b) => [b.lead_id, b]));
+  const prepRows: CallPrepRow[] = upcoming.slice(0, 5).map((m) => {
+    const brief = briefByLead.get(m.leadId) ?? null;
+    const intel = hasIntelligence(brief as never) ? (brief as never as { intelligence: Parameters<typeof openQuestions>[0] }).intelligence : null;
+    return {
+      meeting: m,
+      action: agentActions.find((a) => a.leadId === m.leadId && a.meta.action_type === "prepare_call") ?? null,
+      openQuestions: intel ? openQuestions(intel) : [],
+    };
+  });
+
+  // Opportunities a meeting can be booked against: everything still open,
+  // newest first, with the ones that already have a call marked rather than
+  // hidden — "why isn't Acme in this list" is a worse question than seeing it
+  // greyed out with the reason.
+  const bookedLeadIds = new Set(upcoming.map((m) => m.leadId));
+  const schedulable: SchedulableLead[] = (await listLeadRows())
+    .filter((r) => r.status !== "won" && r.status !== "lost")
+    .map((r) => ({
+      id: r.id,
+      companyName: r.company_name,
+      contactName: r.primary_contact_name,
+      ownerName: r.owner_name,
+      alreadyBooked: bookedLeadIds.has(r.id),
+    }));
 
   // Place each call in its day and minute, in the team's zone. A call that has
   // passed with nothing logged since is the same "overdue" the rest of the app means.
@@ -64,8 +101,11 @@ export default async function SchedulePage({ searchParams }: PageProps<"/schedul
   // The grid is the business day. A call booked outside it (a rescheduled
   // evening slot, a demo record from another zone) goes in the strip above
   // rather than stretching the day to 1 AM and leaving a screen of empty rows.
-  const startMinute = Math.max(0, Math.floor(cfg.hours.start / 60) * 60);
-  const endMinute = Math.min(24 * 60, Math.ceil(cfg.hours.end / 60) * 60);
+  // An hour either side of the office hours, so the open and the close are
+  // both *visible* edges rather than the top and bottom of the card — the
+  // shading only means something if you can see where it starts.
+  const startMinute = Math.max(0, Math.floor((cfg.hours.start - 60) / 60) * 60);
+  const endMinute = Math.min(24 * 60, Math.ceil((cfg.hours.end + 60) / 60) * 60);
   const inHours = placed.filter((m) => m.startMinute >= startMinute && m.startMinute < endMinute);
   const outside = placed.filter((m) => !inHours.includes(m));
 
@@ -84,10 +124,13 @@ export default async function SchedulePage({ searchParams }: PageProps<"/schedul
         <div>
           <h1 className="text-[2rem] font-bold leading-tight tracking-tight text-foreground">Schedule</h1>
           <p className="mt-1 text-[15px] text-muted-foreground">
-            Every discovery call booked across the pipeline, in the week it happens.
+            Every discovery call booked across the pipeline — when it is, who owns it, and which hours are still open for a customer to take.
           </p>
         </div>
-        <IntegrationBadge status={status} />
+        <div className="flex items-center gap-3">
+          <IntegrationBadge status={status} />
+          <NewScheduleDialog leads={schedulable} />
+        </div>
       </div>
 
       {/* Week controls */}
@@ -113,13 +156,37 @@ export default async function SchedulePage({ searchParams }: PageProps<"/schedul
         </p>
       </div>
 
-      <WeekGrid days={days} meetings={inHours} outside={outside} startMinute={startMinute} endMinute={endMinute} timeZone={tz} now={now} />
+      <WeekGrid
+        days={days}
+        meetings={inHours}
+        outside={outside}
+        startMinute={startMinute}
+        endMinute={endMinute}
+        officeStart={cfg.hours.start}
+        officeEnd={cfg.hours.end}
+        timeZone={tz}
+        now={now}
+      />
 
-      {placed.length === 0 && (
-        <p className="mt-3 text-[13px] text-muted-foreground">
-          Customers book a slot at the end of Talk to Sales, and reps can schedule one from any opportunity — booked calls appear here in the week they fall.
-        </p>
-      )}
+      {/* What the shading means, said once rather than guessed at. */}
+      <div className="mt-2.5 flex flex-wrap items-center gap-x-4 gap-y-1.5 text-[11.5px] text-muted-foreground">
+        <span className="inline-flex items-center gap-1.5">
+          <span className="h-3 w-3 rounded-sm border border-border bg-card" /> Bookable — {status.hours}
+        </span>
+        <span className="inline-flex items-center gap-1.5">
+          <span className="h-3 w-3 rounded-sm border border-border bg-muted" /> Outside office hours
+        </span>
+        <span className="inline-flex items-center gap-1.5">
+          <span className="h-3 w-3 rounded-sm border border-primary/25 border-l-2 border-l-primary bg-primary/10" /> Booked call
+        </span>
+        {overdueCount > 0 && (
+          <span className="inline-flex items-center gap-1.5">
+            <span className="h-3 w-3 rounded-sm border border-warning/40 border-l-2 border-l-warning bg-warning/10" /> Happened, nothing logged
+          </span>
+        )}
+      </div>
+
+      <CallPreparation rows={prepRows} timeZone={tz} />
 
       {/* The integration's full state, for when the badge is not enough. */}
       <details className="group mt-6">

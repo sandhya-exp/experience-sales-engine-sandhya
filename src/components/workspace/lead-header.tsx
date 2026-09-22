@@ -5,9 +5,11 @@ import { StageSelect } from "@/components/workspace/stage-select";
 import { CreateQuoteButton } from "@/components/workspace/create-quote-button";
 import { FollowUpChip } from "@/components/workspace/follow-up-chip";
 import { OwnerSelect } from "@/components/workspace/owner-select";
+import { StageTracker } from "@/components/workspace/stage-tracker";
 import type { FollowUp } from "@/lib/repo/followups";
 import type { TeamMember } from "@/lib/repo/users";
 import type { Company, Contact, Lead } from "@/lib/types";
+import type { QuoteRow } from "@/lib/repo/quotes";
 import { computeReadiness } from "@/lib/readiness";
 import type { QualField } from "@/lib/ai/intelligence";
 import { format } from "date-fns";
@@ -21,6 +23,7 @@ export function LeadHeader({
   contacts,
   focusField,
   canContract,
+  quote = null,
 }: {
   lead: Lead;
   company: Company;
@@ -31,6 +34,8 @@ export function LeadHeader({
   focusField: QualField | null;
   /** Admin only: the Continue to Contract handoff. Qualification itself is everyone's. */
   canContract: boolean;
+  /** The active quote, when there is one — it lights the Quote step. */
+  quote?: QuoteRow | null;
 }) {
   const readiness = computeReadiness(lead, contacts);
   const initials = company.name
@@ -68,11 +73,11 @@ export function LeadHeader({
             />
           </div>
         </div>
-        {followUp && lead.status !== "won" && lead.status !== "lost" && (
-          <div className="pb-4">
-            <FollowUpChip leadId={lead.id} followUp={followUp} />
-          </div>
-        )}
+        {/* Where the deal is, before anything else on the page. */}
+        <div className="flex flex-wrap items-center justify-between gap-3 pb-4">
+          <StageTracker status={lead.status} quote={quote ? { version: quote.meta.version, status: quote.meta.status } : null} />
+          {followUp && lead.status !== "won" && lead.status !== "lost" && <FollowUpChip leadId={lead.id} followUp={followUp} />}
+        </div>
       </div>
     </div>
   );

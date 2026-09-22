@@ -5,6 +5,8 @@ import { listLatestBriefs } from "@/lib/repo/aiBriefs";
 import { listOverdueMeetings, listUpcomingMeetings } from "@/lib/repo/schedule";
 import { calendarStatus } from "@/lib/calendar/status";
 import { listClearedSince, type ClearedItem } from "@/lib/repo/activities";
+import { listOpenAgentActions } from "@/lib/repo/agentActions";
+import { listOpenQuotes } from "@/lib/repo/quotes";
 import { schedulingConfig } from "@/lib/calendar/config";
 import { formatInZone, zonedToUtc } from "@/lib/calendar/time";
 import { ACTIVITY_TYPE_LABELS } from "@/lib/format";
@@ -41,7 +43,7 @@ export default async function ScheduledTasksPage({ searchParams }: PageProps<"/t
     return zonedToUtc(y, m, d, 0, 0, tz);
   })();
 
-  const [rows, briefs, upcoming, overdue, user, calendar, cleared] = await Promise.all([
+  const [rows, briefs, upcoming, overdue, user, calendar, cleared, agentActions, quotes] = await Promise.all([
     listLeadRows(),
     listLatestBriefs(),
     listUpcomingMeetings(50),
@@ -49,10 +51,12 @@ export default async function ScheduledTasksPage({ searchParams }: PageProps<"/t
     getCurrentUser(),
     calendarStatus(),
     listClearedSince(startOfDay),
+    listOpenAgentActions(),
+    listOpenQuotes(),
   ]);
 
   // Handoff tasks belong to the role that can perform the handoff.
-  const all = tasksForRole(buildTasks(buildInsights(rows, briefs), upcoming, overdue), user?.role ?? "sales");
+  const all = tasksForRole(buildTasks(buildInsights(rows, briefs), upcoming, overdue, agentActions, quotes), user?.role ?? "sales");
   const byOwner = mineOnly && user ? all.filter((t) => t.ownerName === user.name) : all;
   const tasks = kind === "all" ? byOwner : byOwner.filter((t) => t.kind === kind);
 

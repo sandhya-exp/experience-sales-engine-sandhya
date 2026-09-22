@@ -1,7 +1,7 @@
 import { computeReadiness } from "@/lib/readiness";
 import type { OpportunityIntelligence } from "@/lib/ai/intelligence";
-import { DOWNSTREAM } from "@/lib/modules";
 import { getWorkspaceData } from "@/lib/repo/workspace";
+import { activeQuote, effectiveStatus, listQuotesForLead } from "@/lib/repo/quotes";
 import type { Activity, AiDealBrief, Company, Lead } from "@/lib/types";
 
 /**
@@ -90,6 +90,22 @@ export interface QuoteHandoffPayload {
   /** The one AI-derived thing the contract module uses: commercial implications of the requirements. */
   insights: string[];
 
+  /**
+   * The active quote, when one exists — the version the customer is looking
+   * at or accepted, with its line items and validity. Null when sales handed
+   * over without quoting here.
+   */
+  quote: {
+    version: number;
+    status: string;
+    currency: string;
+    total: number;
+    discount_pct: number;
+    valid_until: string;
+    terms: string | null;
+    line_items: { description: string; quantity: number; unit_price: number; discount_pct: number }[];
+  } | null;
+
   /** Pull endpoint for the same payload. */
   links: { handoff_api_url: string };
 }
@@ -108,6 +124,7 @@ export async function buildHandoffPayload(
   const data = await getWorkspaceData(leadId);
   if (!data) return null;
   const { lead, company, contacts, activities, brief, ownerName } = data;
+  const quote = activeQuote(await listQuotesForLead(leadId));
   const q = lead.qualification ?? {};
   const intel = intelligenceOf(brief);
   const readiness = computeReadiness(lead, contacts);
@@ -158,6 +175,18 @@ export async function buildHandoffPayload(
       .slice(0, 5)
       .map((a) => ({ type: a.type, body: a.body, actor: a.actor_name ?? "System", occurred_at: a.occurred_at })),
     insights: intel?.quote_implications ?? [],
+    quote: quote
+      ? {
+          version: quote.meta.version,
+          status: effectiveStatus(quote.meta),
+          currency: quote.meta.currency,
+          total: quote.meta.total,
+          discount_pct: quote.meta.discount_pct,
+          valid_until: quote.meta.valid_until,
+          terms: quote.meta.terms,
+          line_items: quote.meta.line_items,
+        }
+      : null,
     links: { handoff_api_url: `${appOrigin}/api/handoff/${lead.id}` },
   };
 }
@@ -167,91 +196,30 @@ function intelligenceOf(b: AiDealBrief | null): OpportunityIntelligence | null {
 }
 
 /* ------------------------------------------------------------------ */
-/* Where the contract module lives and how we reach it                 */
+/* Recording the handoff                                              */
 /* ------------------------------------------------------------------ */
 
-export interface QuoteWorkspaceConfig {
-  /** Base URL of the contract module, e.g. http://127.0.0.1:8001 */
-  baseUrl: string | null;
-  /** POST target for the push path. Defaults to {baseUrl}/api/handoffs */
-  endpoint: string | null;
-  /**
-   * Where to send the user afterwards. Supports {accountKey}, {leadId}.
-   * Defaults to {baseUrl}/?lead_id={leadId}&customer_id={accountKey} — the Quote Ready
-   * module (modules/guided-selling) opens that handoff, or its Customer 360 once accepted.
-   */
-  accountUrlTemplate: string | null;
-  /** Optional shared secret sent as X-Sales-Engine-Key on the push. */
-  apiKey: string | null;
-}
-
-export function getQuoteWorkspaceConfig(): QuoteWorkspaceConfig {
-  const baseUrl = trimSlash(process.env.QUOTE_WORKSPACE_URL) ?? null;
-  return {
-    baseUrl,
-    endpoint: process.env.QUOTE_HANDOFF_ENDPOINT || (baseUrl ? `${baseUrl}/api/handoffs` : null),
-    accountUrlTemplate:
-      process.env.QUOTE_ACCOUNT_URL_TEMPLATE ||
-      (baseUrl ? `${baseUrl}/?lead_id={leadId}&customer_id={accountKey}` : null),
-    apiKey: process.env.HANDOFF_API_KEY || null,
-  };
-}
-
-export function quoteWorkspaceUrlFor(accountKey: string, leadId: string): string | null {
-  const { accountUrlTemplate } = getQuoteWorkspaceConfig();
-  if (!accountUrlTemplate) return null;
-  return accountUrlTemplate
-    .replace("{accountKey}", encodeURIComponent(accountKey))
-    .replace("{leadId}", encodeURIComponent(leadId));
-}
-
 export interface DeliveryResult {
-  status: "delivered" | "pending" | "not_configured";
-  /** Where to send the user. */
+  status: "recorded";
+  /** Where to send the user afterwards — the opportunity's own timeline. */
   url: string | null;
   detail: string;
 }
 
 /**
- * Push the payload to the contract module. Never throws: an unreachable or
- * not-yet-implemented endpoint downgrades to "pending" (the quote side can
- * pull from /api/handoff/{leadId}) and we still navigate the user across.
+ * The handoff, now that contracting is a separate application.
+ *
+ * This workspace owns the lifecycle up to Ready to Contract: it assembles the
+ * quote context from the opportunity, marks the stage, and records what was
+ * handed over on the timeline. It no longer pushes to a downstream service —
+ * whoever builds contracting reads the same context from
+ * GET /api/handoff/{leadId} (docs/QUOTE_HANDOFF.md), which is the one published
+ * contract and needs nothing running here.
  */
 export async function deliverHandoff(payload: QuoteHandoffPayload): Promise<DeliveryResult> {
-  const cfg = getQuoteWorkspaceConfig();
-  const fallbackUrl = quoteWorkspaceUrlFor(payload.customer.key, payload.opportunity.id);
-
-  if (!cfg.endpoint) {
-    return { status: "not_configured", url: fallbackUrl, detail: "QUOTE_WORKSPACE_URL is not set." };
-  }
-
-  try {
-    const res = await fetch(cfg.endpoint, {
-      method: "POST",
-      headers: {
-        "content-type": "application/json",
-        ...(cfg.apiKey ? { "x-sales-engine-key": cfg.apiKey } : {}),
-      },
-      body: JSON.stringify(payload),
-      signal: AbortSignal.timeout(6000),
-      cache: "no-store",
-    });
-    if (!res.ok) {
-      return { status: "pending", url: fallbackUrl, detail: `${DOWNSTREAM.partner} responded ${res.status}.` };
-    }
-    // The quote side may tell us exactly where the account now lives.
-    const body = (await res.json().catch(() => ({}))) as { account_url?: string; redirect_url?: string };
-    const url = body.account_url || body.redirect_url || fallbackUrl;
-    return { status: "delivered", url, detail: `Quote context delivered to ${DOWNSTREAM.partner}.` };
-  } catch (err) {
-    return {
-      status: "pending",
-      url: fallbackUrl,
-      detail: `${DOWNSTREAM.partner} not reachable (${err instanceof Error ? err.message : "error"}); it will pull the context on open.`,
-    };
-  }
-}
-
-function trimSlash(v: string | undefined) {
-  return v ? v.replace(/\/+$/, "") : undefined;
+  return {
+    status: "recorded",
+    url: `/leads/${payload.opportunity.id}?tab=activity`,
+    detail: `Quote context recorded: ${payload.contacts.length} contact${payload.contacts.length === 1 ? "" : "s"}, qualification and ${payload.insights.length} insight${payload.insights.length === 1 ? "" : "s"}.`,
+  };
 }

@@ -40,3 +40,12 @@ export function activityLabel(type: ActivityType, metadata?: Record<string, unkn
   if (metadata?.kind === "follow_up") return metadata.completed ? "Call completed" : "Call booked";
   return ACTIVITY_TYPE_LABELS[type];
 }
+
+/**
+ * Whole days since a timestamp. Lives here rather than inline in a component
+ * because "now" is not a pure value: read it once, in one place, alongside the
+ * other time formatting.
+ */
+export function daysSince(iso: string | Date): number {
+  return Math.max(0, Math.floor((Date.now() - new Date(iso).getTime()) / 86_400_000));
+}

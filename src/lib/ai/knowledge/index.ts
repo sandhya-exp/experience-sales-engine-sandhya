@@ -7,7 +7,7 @@
  * inquiry form), the integrations prospects most often ask about by industry,
  * how the team qualifies an opportunity, and what Quote Ready needs to
  * receive. They deliberately contain NO pricing, packages, tiers or discounts —
- * that is Quote Ready's domain, downstream of this module.
+ * that is contracting's domain, downstream of this application.
  *
  * Every document has a stable id so the AI can cite it and the evaluator can
  * verify that anything cited was actually retrieved.
@@ -147,7 +147,7 @@ export const SALES_KNOWLEDGE: KnowledgeDoc[] = [
     category: "qualification",
     tags: ["timeline", "urgency", "budget", "fiscal year", "board", "renewal date", "competitor contract"],
     content:
-      "Timeline sets quote validity and urgency: ask what is driving the date (a competitor contract ending, a board or fiscal deadline, a new-location opening). Budget is captured as context only — a range or an approval ceiling the customer has stated. It is passed to Quote Ready as background and never becomes a price, package or discount in this module. If the customer has not stated a budget, record it as missing rather than estimating one.",
+      "Timeline sets quote validity and urgency: ask what is driving the date (a competitor contract ending, a board or fiscal deadline, a new-location opening). Budget is captured as context only — a range or an approval ceiling the customer has stated. It is passed on as background and never becomes a price, package or discount in this module. If the customer has not stated a budget, record it as missing rather than estimating one.",
   },
   {
     id: "qual-current-solution",
@@ -168,12 +168,12 @@ export const SALES_KNOWLEDGE: KnowledgeDoc[] = [
 
   /* --------------------------------------------------------------- quote prep */
   {
-    id: "qp-guided-selling-inputs",
-    title: "What Quote Ready needs from qualification",
+    id: "qp-contract-inputs",
+    title: "What contracting needs from qualification",
     category: "quote_prep",
-    tags: ["guided selling", "handoff", "quote context", "readiness", "inputs", "checklist"],
+    tags: ["contract", "handoff", "quote context", "readiness", "inputs", "checklist"],
     content:
-      "Quote Ready builds the quote, approval and contract from the quote context this module hands over. The handoff should carry: customer and industry, confirmed user count and deployment scope (locations), primary need and any secondary capabilities, named integrations with their role (trigger source vs. notification), current solution, decision timeline, decision maker (used as signer), budget as stated context, primary contact and the full contact list. Anything unconfirmed should be marked as a gap, not filled with an assumption.",
+      "Contracting builds the quote, approval and contract from the quote context this workspace hands over. The handoff should carry: customer and industry, confirmed user count and deployment scope (locations), primary need and any secondary capabilities, named integrations with their role (trigger source vs. notification), current solution, decision timeline, decision maker (used as signer), budget as stated context, primary contact and the full contact list. Anything unconfirmed should be marked as a gap, not filled with an assumption.",
   },
   {
     id: "qp-no-pricing-here",

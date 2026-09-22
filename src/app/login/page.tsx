@@ -8,10 +8,7 @@ import { LoginForm } from "@/components/login/login-form";
  * and a quiet product panel that shows what the workspace is for (the pipeline
  * itself, not a mascot). Customers never land here — they use Talk to Sales (/inquire).
  */
-export default async function LoginPage({ searchParams }: PageProps<"/login">) {
-  const sp = await searchParams;
-  const oauthError = typeof sp.error === "string" ? sp.error : undefined;
-
+export default function LoginPage() {
   return (
     <div className="flex min-h-screen w-full items-center justify-center bg-background px-4 py-10">
       <div className="grid w-full max-w-5xl overflow-hidden rounded-2xl border border-border bg-card card-shadow lg:grid-cols-[1.05fr_1fr]">
@@ -46,7 +43,7 @@ export default async function LoginPage({ searchParams }: PageProps<"/login">) {
           </div>
           <h1 className="text-[1.75rem] font-bold tracking-tight text-foreground">Welcome back</h1>
           <p className="mb-7 mt-1 text-sm text-muted-foreground">Sign in to the Sales Engine with your Experience.com account.</p>
-          <LoginForm oauthError={oauthError} />
+          <LoginForm />
           <p className="mt-6 text-xs text-muted-foreground">
             Demo account: <span className="font-medium text-foreground">sandhya@experience.com</span> /{" "}
             <span className="font-medium text-foreground">demo1234</span>

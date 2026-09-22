@@ -47,11 +47,19 @@ export class LocalAvailabilityProvider implements CalendarProvider {
   }
 
   async createEvent(input: CreateEventInput): Promise<CreatedEvent> {
+    const conf = input.conference ?? null;
+    // A link the rep pasted is real and survives; a Meet link cannot be created
+    // without Google, and this provider will not pretend otherwise.
+    const pasted = conf && (conf.kind === "zoom" || conf.kind === "teams") ? conf.url : null;
     return {
       id: `local-${input.start.getTime()}`,
       htmlLink: null,
       attendeesInvited: false,
-      note: "Demo mode — no calendar event was created because Google Calendar is not configured.",
+      conferenceUrl: pasted,
+      note:
+        conf?.kind === "meet"
+          ? "Demo mode — no calendar event and no Google Meet link, because Google Calendar is not configured."
+          : "Demo mode — no calendar event was created because Google Calendar is not configured.",
     };
   }
 }

@@ -35,22 +35,11 @@ export function QuoteHandoffConfirm({
         return;
       }
 
-      if (result.url) {
-        setPhase("opening");
-        toast.success(
-          result.status === "delivered"
-            ? `Quote context handed to ${DOWNSTREAM.partner}.`
-            : `Handoff recorded — ${DOWNSTREAM.partner} will pick it up when it is back online.`
-        );
-        // The downstream module is embedded on the Quote Ready page, opened on this opportunity.
-        router.push(`${DOWNSTREAM.route}?lead=${leadId}`);
-        return;
-      }
-
-      // Partner module URL not configured in this environment: the handoff is
-      // still recorded; show the outcome on the lead's timeline.
-      toast.success("Handoff recorded on the timeline.");
-      router.push(`/leads/${leadId}?tab=activity`);
+      setPhase("opening");
+      toast.success(`Quote context recorded — the opportunity is ${DOWNSTREAM.name}.`);
+      // Contracting is a separate application; what this workspace owns is the
+      // record, so the user lands back on the timeline that now shows it.
+      router.push(result.url ?? `/leads/${leadId}?tab=activity`);
     });
 
   const busy = pending || phase !== "idle";

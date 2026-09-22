@@ -7,9 +7,8 @@ import { buildHandoffPayload } from "@/lib/handoff";
 /**
  * GET /api/handoff/{leadId}
  *
- * The "pull" side of the Quote Ready handoff: the downstream module fetches the
- * complete lead/account context for a lead it was pointed at. Same payload the
- * "push" POST sends. Authorised by either a signed-in Sales Engine session
+ * The published handoff contract: whatever picks up contracting reads the
+ * complete opportunity/account context for a lead from here. Authorised by either a signed-in Sales Engine session
  * (same browser) or the shared HANDOFF_API_KEY header (server-to-server).
  */
 export async function GET(_req: Request, ctx: RouteContext<"/api/handoff/[leadId]">) {
@@ -39,7 +38,9 @@ export async function OPTIONS() {
 
 function cors() {
   return {
-    "access-control-allow-origin": process.env.QUOTE_WORKSPACE_URL ?? "*",
+    // Whoever builds contracting sets their origin here; server-to-server callers
+    // (the shared key path) are unaffected by CORS either way.
+    "access-control-allow-origin": process.env.HANDOFF_ALLOWED_ORIGIN ?? "*",
     "access-control-allow-headers": "content-type, x-sales-engine-key",
     "access-control-allow-methods": "GET, OPTIONS",
   };

@@ -28,6 +28,14 @@ export interface CreateEventInput {
   /** IANA time zone the event is expressed in (the sales team's). */
   timeZone: string;
   attendees: { email: string; displayName?: string; optional?: boolean }[];
+  /**
+   * How the meeting happens. "meet" asks Google to create a Meet link on the
+   * event itself — the only one this app can generate, because it rides the
+   * Calendar integration that already exists. Zoom and Teams would each need
+   * their own OAuth app, so for those the rep supplies the link and it is
+   * attached to the event and the invitation.
+   */
+  conference?: { kind: "meet" } | { kind: "zoom" | "teams"; url: string } | { kind: "none" } | null;
 }
 
 export interface CreatedEvent {
@@ -37,6 +45,8 @@ export interface CreatedEvent {
   attendeesInvited: boolean;
   /** Anything the rep should know (e.g. "invitations must be sent manually"). */
   note?: string;
+  /** The joining link, when the event has one. */
+  conferenceUrl?: string | null;
 }
 
 export interface ProviderInfo {

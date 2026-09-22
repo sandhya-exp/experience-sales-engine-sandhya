@@ -1,6 +1,7 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { AddContactDialog } from "@/components/workspace/add-contact-dialog";
+import { EditContactDialog } from "@/components/workspace/edit-contact-dialog";
 import type { Contact } from "@/lib/types";
 
 export function ContactsTab({ leadId, companyId, contacts }: { leadId: string; companyId: string; contacts: Contact[] }) {
@@ -19,6 +20,7 @@ export function ContactsTab({ leadId, companyId, contacts }: { leadId: string; c
               <TableHead>Email</TableHead>
               <TableHead>Phone</TableHead>
               <TableHead>Primary</TableHead>
+              <TableHead className="w-16 text-right">Edit</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -41,6 +43,9 @@ export function ContactsTab({ leadId, companyId, contacts }: { leadId: string; c
                   )}
                 </TableCell>
                 <TableCell className="text-[13px] text-muted-foreground">{c.is_primary ? "Primary" : ""}</TableCell>
+                <TableCell className="py-1 text-right">
+                  <EditContactDialog leadId={leadId} contact={c} />
+                </TableCell>
               </TableRow>
             ))}
           </TableBody>

@@ -1,19 +1,5 @@
 import Link from "next/link";
-import {
-  AlertTriangle,
-  ArrowRight,
-  BrainCircuit,
-  CalendarDays,
-  CheckCircle2,
-  CircleAlert,
-  Clock,
-  ExternalLink,
-  ListChecks,
-  ShieldCheck,
-  Sparkles,
-  UserPlus,
-  Video,
-} from "lucide-react";
+import { AlertTriangle, ArrowRight, Bot, BrainCircuit, CalendarDays, CheckCircle2, CircleAlert, Clock, ExternalLink, ListChecks, ShieldAlert, ShieldCheck, Sparkles, UserPlus, Video } from "lucide-react";
 import { DOWNSTREAM } from "@/lib/modules";
 import { StageBadge } from "@/components/dashboard/leads-table";
 import { formatActivityTime, ACTIVITY_TYPE_LABELS } from "@/lib/format";
@@ -95,6 +81,10 @@ const TASK_ICON: Record<TaskKind, React.ComponentType<{ className?: string }>> =
   qualification_gap: ListChecks,
   ai_next_action: Sparkles,
   quote_handoff: ShieldCheck,
+  agent_approval: ShieldAlert,
+  agent_waiting: Bot,
+  quote_approval: ShieldCheck,
+  quote_follow_up: Clock,
 };
 
 export function TasksPanel({ tasks, limit = 5 }: { tasks: SalesTask[]; limit?: number }) {

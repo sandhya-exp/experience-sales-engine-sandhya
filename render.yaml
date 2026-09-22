@@ -1,10 +1,6 @@
-# Render blueprint: ONE service for the whole Sales Engine.
-#
-# The Next.js workspace and the quote module (FastAPI) run in a single
-# container built from the Dockerfile at the repo root. The module listens on
-# the container's loopback; the workspace proxies it and is the only public
-# listener. One deploy, one URL, one log stream — nothing to configure between
-# the two halves, because there is no gap between them to configure.
+# Render blueprint: one service, one container, built from the Dockerfile at
+# the repo root. The Sales Engine is a single Next.js application — one deploy,
+# one URL, one log stream.
 services:
   - type: web
     name: experience-sales-engine
@@ -18,7 +14,7 @@ services:
         sync: false
       - key: SESSION_SECRET
         generateValue: true
-      # Shared secret for the handoff push (workspace -> module, in-container).
+      # Shared secret accepted on GET /api/handoff/{leadId} (docs/QUOTE_HANDOFF.md).
       - key: HANDOFF_API_KEY
         generateValue: true
       # Optional: AI Opportunity Intelligence runs deterministically without it.

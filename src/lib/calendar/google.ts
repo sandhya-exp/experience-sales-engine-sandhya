@@ -50,15 +50,26 @@ export class GoogleCalendarProvider implements CalendarProvider {
   }
 
   async createEvent(input: CreateEventInput): Promise<CreatedEvent> {
+    const conf = input.conference ?? null;
+    // A Meet link is created by Google as part of the event; a Zoom or Teams
+    // link is the rep's own and travels as the event location so it appears in
+    // the invitation exactly as they pasted it.
+    const wantsMeet = conf?.kind === "meet";
+    const pastedUrl = conf && (conf.kind === "zoom" || conf.kind === "teams") ? conf.url : null;
     const body = {
       summary: input.summary,
-      description: input.description,
+      description: pastedUrl ? `${input.description}\n\nJoin: ${pastedUrl}` : input.description,
       start: { dateTime: input.start.toISOString(), timeZone: input.timeZone },
       end: { dateTime: input.end.toISOString(), timeZone: input.timeZone },
       attendees: input.attendees,
       reminders: { useDefault: true },
+      ...(pastedUrl ? { location: pastedUrl } : {}),
+      ...(wantsMeet
+        ? { conferenceData: { createRequest: { requestId: `se-${Date.now().toString(36)}`, conferenceSolutionKey: { type: "hangoutsMeet" } } } }
+        : {}),
     };
-    const path = `/calendar/v3/calendars/${encodeURIComponent(input.calendarId)}/events?sendUpdates=all`;
+    // conferenceDataVersion=1 is required for Google to honour createRequest.
+    const path = `/calendar/v3/calendars/${encodeURIComponent(input.calendarId)}/events?sendUpdates=all${wantsMeet ? "&conferenceDataVersion=1" : ""}`;
     let res = await this.call(path, { method: "POST", body: JSON.stringify(body) }, { allowError: true });
     let attendeesInvited = true;
     let note: string | undefined;
@@ -70,13 +81,14 @@ export class GoogleCalendarProvider implements CalendarProvider {
       if (/forbiddenForServiceAccounts|attendees/i.test(err)) {
         attendeesInvited = false;
         note = "Google would not send invitations from the service account (no domain-wide delegation) — the event is on the team calendar; the rep sends the invite.";
-        res = await this.call(path.replace("?sendUpdates=all", ""), { method: "POST", body: JSON.stringify({ ...body, attendees: undefined }) });
+        res = await this.call(path.replace("?sendUpdates=all", "?"), { method: "POST", body: JSON.stringify({ ...body, attendees: undefined }) });
       } else {
         throw new Error(`Google Calendar events.insert 403: ${err.slice(0, 200)}`);
       }
     }
-    const data = (await res.json()) as { id: string; htmlLink?: string };
-    return { id: data.id, htmlLink: data.htmlLink ?? null, attendeesInvited, note };
+    const data = (await res.json()) as { id: string; htmlLink?: string; hangoutLink?: string; conferenceData?: { entryPoints?: { uri?: string }[] } };
+    const meetUrl = data.hangoutLink ?? data.conferenceData?.entryPoints?.find((e) => e.uri?.startsWith("http"))?.uri ?? null;
+    return { id: data.id, htmlLink: data.htmlLink ?? null, attendeesInvited, note, conferenceUrl: pastedUrl ?? meetUrl };
   }
 
   /* ------------------------------------------------------------ transport */

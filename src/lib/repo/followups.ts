@@ -29,6 +29,8 @@ export interface FollowUpCalendar {
   /** Whether the calendar provider sent invitations to the attendees. */
   invited: boolean;
   note?: string;
+  /** How the meeting happens, and the link to join it. */
+  conference?: { kind: "meet" | "zoom" | "teams" | "none"; url: string | null } | null;
 }
 
 export const FOLLOW_UP_KIND = "follow_up";

@@ -1,4 +1,4 @@
-import { Search, AlertTriangle } from "lucide-react";
+import { Search, AlertTriangle, LayoutGrid, List } from "lucide-react";
 import { DOWNSTREAM } from "@/lib/modules";
 
 const STAGE_PILLS: { key: string; label: string }[] = [
@@ -18,6 +18,10 @@ import { LEAD_STATUSES } from "@/lib/types";
 import type { LeadStatus } from "@/lib/types";
 import { needsAttention, inDateRange, parseDateFilter, describeDateFilter } from "@/lib/dashboard";
 import { LeadsTable } from "@/components/dashboard/leads-table";
+import { PipelineBoard } from "@/components/dashboard/pipeline-board";
+import { PipelineFilters } from "@/components/dashboard/pipeline-filters";
+import { listTeam } from "@/lib/repo/users";
+import { listOpenQuotes } from "@/lib/repo/quotes";
 import { cn } from "@/lib/utils";
 import { Input } from "@/components/ui/input";
 import { DateRangeField } from "@/components/dashboard/date-range-field";
@@ -30,6 +34,9 @@ export default async function PipelinePage({ searchParams }: PageProps<"/pipelin
   const range = dateFilter.range;
   const industry = typeof params.industry === "string" ? params.industry : "";
   const owner = typeof params.owner === "string" ? params.owner : ""; // "me" | user id | "unassigned"
+  // Board is the default: the shape of the pipeline is the question this page
+  // exists to answer, and the table is one click away for the detail.
+  const view = params.view === "list" ? "list" : "board";
   const me = await getCurrentUser();
   const ownerId = owner === "me" ? me?.id ?? "" : owner;
   // Everything except `stage`, so stage links / chips / search can keep the other filters.
@@ -39,6 +46,7 @@ export default async function PipelinePage({ searchParams }: PageProps<"/pipelin
   if (dateFilter.to) keep.set("to", dateFilter.to);
   if (industry) keep.set("industry", industry);
   if (owner) keep.set("owner", owner);
+  if (view === "list") keep.set("view", "list");
   const withKeep = (base: string, extra?: Record<string, string>) => {
     const p = new URLSearchParams(keep);
     for (const [k, v] of Object.entries(extra ?? {})) {
@@ -49,7 +57,16 @@ export default async function PipelinePage({ searchParams }: PageProps<"/pipelin
     return qs ? `${base}?${qs}` : base;
   };
 
-  const fetchedRows = await listLeadRows();
+  const [fetchedRows, team, allQuotes] = await Promise.all([listLeadRows(), listTeam(), listOpenQuotes()]);
+  // What each opportunity is worth, for the board's card and column totals:
+  // the active (non-superseded) quote on it. No quote, no number — this page
+  // does not estimate a deal's value.
+  const valueByLead = new Map<string, number>();
+  for (const q of allQuotes) {
+    if (q.meta.superseded) continue;
+    const current = valueByLead.get(q.leadId);
+    if (current === undefined) valueByLead.set(q.leadId, q.meta.total);
+  }
   // The date range scopes everything on the page: stage counts, attention, table.
   const allRows = fetchedRows.filter(
     (r) =>
@@ -70,6 +87,17 @@ export default async function PipelinePage({ searchParams }: PageProps<"/pipelin
   const attentionCount = allRows.filter(
     (r) => needsAttention(r).flagged,
   ).length;
+  // Options for the owner and industry dropdowns. Counted before the stage
+  // filter so switching stage never makes an option vanish mid-task.
+  const industryMap = new Map<string, number>();
+  for (const r of fetchedRows) {
+    const key = r.company_industry ?? "Unspecified";
+    industryMap.set(key, (industryMap.get(key) ?? 0) + 1);
+  }
+  const industryCounts = [...industryMap.entries()]
+    .map(([industry, count]) => ({ industry, count }))
+    .sort((a, b) => b.count - a.count || a.industry.localeCompare(b.industry));
+  const unassignedCount = fetchedRows.filter((r) => !r.owner_user_id && r.status !== "won" && r.status !== "lost").length;
 
   let rows = allRows;
   if (stage === "attention") {
@@ -83,9 +111,34 @@ export default async function PipelinePage({ searchParams }: PageProps<"/pipelin
 
   return (
     <div className="mx-auto max-w-7xl px-6 pb-12 pt-8">
-      <div className="mb-6">
-        <h1 className="mt-1.5 text-[2rem] font-bold leading-tight tracking-tight text-foreground">Sales Pipeline</h1>
-        <p className="mt-1 text-[15px] text-muted-foreground">Every open opportunity, and what needs to happen next on each.</p>
+      <div className="mb-6 flex flex-wrap items-end justify-between gap-4">
+        <div>
+          <h1 className="mt-1.5 text-[2rem] font-bold leading-tight tracking-tight text-foreground">Sales Pipeline</h1>
+          <p className="mt-1 text-[15px] text-muted-foreground">Every open opportunity, and what needs to happen next on each.</p>
+        </div>
+        {/* Board or table — the same rows, the same filters, two readings. */}
+        <div className="flex items-center gap-1 rounded-lg border border-border bg-card p-1 card-shadow">
+          {(
+            [
+              { key: "board", label: "Board", Icon: LayoutGrid },
+              { key: "list", label: "Table", Icon: List },
+            ] as const
+          ).map((v) => (
+            <Link
+              key={v.key}
+              href={withKeep("/pipeline", { view: v.key === "board" ? "" : v.key, ...(stage !== "all" ? { stage } : {}), ...(q ? { q } : {}) })}
+              aria-pressed={view === v.key}
+              aria-label={`${v.label} view`}
+              className={cn(
+                "inline-flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-[13px] font-medium transition-colors",
+                view === v.key ? "bg-navy text-white" : "text-muted-foreground hover:bg-muted hover:text-foreground"
+              )}
+            >
+              <v.Icon className="h-3.5 w-3.5" />
+              {v.label}
+            </Link>
+          ))}
+        </div>
       </div>
 
       {/* Sales Pipeline — the primary workspace */}
@@ -135,6 +188,13 @@ export default async function PipelinePage({ searchParams }: PageProps<"/pipelin
             )}
           </div>
           <div className="flex flex-wrap items-center gap-2">
+            {/* Owner and industry, on the view they filter rather than in the nav. */}
+            <PipelineFilters
+              team={team.map((m) => ({ id: m.id, name: m.name, open_leads: m.open_leads }))}
+              currentUserId={me?.id ?? ""}
+              industries={industryCounts}
+              unassignedCount={unassignedCount}
+            />
             {/* Start date → End date, inline, the way a range reads elsewhere in
                 the product — rather than a dropdown that hides what it applied. */}
             <DateRangeField
@@ -176,7 +236,11 @@ export default async function PipelinePage({ searchParams }: PageProps<"/pipelin
             </Link>
           </div>
         )}
-        <LeadsTable rows={rows} />
+        {view === "board" ? (
+          <PipelineBoard rows={rows} valueByLead={valueByLead} focus={stage !== "all" && LEAD_STATUSES.includes(stage as LeadStatus) ? (stage as LeadStatus) : null} />
+        ) : (
+          <LeadsTable rows={rows} />
+        )}
       </section>
 
     </div>

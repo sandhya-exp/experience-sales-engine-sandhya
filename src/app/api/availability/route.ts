@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { computeAvailability } from "@/lib/calendar/index";
+import { isMeetingDuration } from "@/lib/calendar/recommend";
 
 export const dynamic = "force-dynamic";
 
@@ -9,9 +10,13 @@ export const dynamic = "force-dynamic";
  * never any calendar event detail. Free/busy is read server-side; the customer
  * sees the collapsed result.
  */
-export async function GET() {
+export async function GET(request: Request) {
   try {
-    const a = await computeAvailability();
+    // The length comes from the browser, so it is checked against the allowed
+    // set here rather than trusted — anything else falls back to the default.
+    const raw = new URL(request.url).searchParams.get("minutes");
+    const minutes = isMeetingDuration(Number(raw)) ? Number(raw) : undefined;
+    const a = await computeAvailability({ minutes });
     return NextResponse.json({
       provider: { kind: a.provider.kind, label: a.provider.label, configured: a.provider.configured },
       timeZone: a.timeZone,

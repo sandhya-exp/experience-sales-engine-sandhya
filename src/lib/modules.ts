@@ -1,14 +1,13 @@
 /**
  * Naming for the handoff boundary. This workspace owns
  *   Customer Inquiry → Opportunity → Qualification → AI Opportunity Intelligence → Quote Context
- * and hands off into the contract module (Quote → Approval → Contract → E-signature → Renewal).
+ * and hands off from there into contracting (quote → approval → contract →
+ * e-signature → renewal), which is a separate application.
  *
  * The stage after Qualification is called **Ready to Contract** everywhere a
  * person can read it: sidebar, pipeline column, stage badges, buttons,
- * headings, handoff copy and AI output. The underlying module is unchanged —
- * its folder (modules/guided-selling), its route (/guided-selling), its API
- * endpoints and the `quoted` lead status stay as they are, because those are
- * data and integration names, not labels.
+ * headings, handoff copy and AI output. The stored lead status stays `quoted`,
+ * because that is data, not a label.
  *
  * Each label is written out rather than templated off the stage name: "Continue
  * to Ready to Contract" is what templating produces, and it reads badly. Change
@@ -22,7 +21,7 @@ const PARTNER = process.env.NEXT_PUBLIC_PARTNER_MODULE_NAME?.trim() || STAGE;
 export const DOWNSTREAM = {
   /** The stage: "Ready to Contract" */
   name: STAGE,
-  /** The module the quote context is handed to (quote → approval → contract → e-signature → renewal) */
+  /** Who the quote context is handed to (quote → approval → contract → e-signature → renewal) */
   partner: PARTNER,
   /** Header / primary CTA that moves an opportunity across the boundary */
   continueLabel: "Continue to Contract",
@@ -32,5 +31,6 @@ export const DOWNSTREAM = {
   navLabel: STAGE,
   /** Heading for the readiness checklist. */
   readinessLabel: "Contract readiness",
-  route: "/guided-selling",
+  /** Where "Ready to Contract" leads inside this app: its own pipeline stage. */
+  route: "/pipeline?stage=quoted",
 } as const;

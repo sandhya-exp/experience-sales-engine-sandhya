@@ -4,6 +4,11 @@ import { listLeadRows } from "@/lib/repo/leads";
 import { listLatestBriefs } from "@/lib/repo/aiBriefs";
 import { listOverdueMeetings, listUpcomingMeetings } from "@/lib/repo/schedule";
 import { calendarStatus } from "@/lib/calendar/status";
+import { listClearedSince, type ClearedItem } from "@/lib/repo/activities";
+import { schedulingConfig } from "@/lib/calendar/config";
+import { formatInZone, zonedToUtc } from "@/lib/calendar/time";
+import { ACTIVITY_TYPE_LABELS } from "@/lib/format";
+import { CheckCircle2 } from "lucide-react";
 import { getCurrentUser } from "@/lib/auth";
 import { buildInsights } from "@/lib/insights";
 import { buildTasks, tasksForRole, TASK_KIND_LABELS, type SalesTask, type TaskKind } from "@/lib/tasks";
@@ -28,13 +33,22 @@ export default async function ScheduledTasksPage({ searchParams }: PageProps<"/t
   const view = typeof params.view === "string" ? params.view : "all";
   const mineOnly = params.owner === "me";
 
-  const [rows, briefs, upcoming, overdue, user, calendar] = await Promise.all([
+  const tz = schedulingConfig().timeZone;
+  // Local midnight in the team's zone — "today" has to mean their today.
+  const startOfDay = (() => {
+    const key = new Date().toLocaleDateString("en-CA", { timeZone: tz });
+    const [y, m, d] = key.split("-").map(Number);
+    return zonedToUtc(y, m, d, 0, 0, tz);
+  })();
+
+  const [rows, briefs, upcoming, overdue, user, calendar, cleared] = await Promise.all([
     listLeadRows(),
     listLatestBriefs(),
     listUpcomingMeetings(50),
     listOverdueMeetings(50),
     getCurrentUser(),
     calendarStatus(),
+    listClearedSince(startOfDay),
   ]);
 
   // Handoff tasks belong to the role that can perform the handoff.
@@ -88,7 +102,17 @@ export default async function ScheduledTasksPage({ searchParams }: PageProps<"/t
     { key: "overdue", label: "Overdue" },
     { key: "upcoming", label: "Upcoming" },
     { key: "anytime", label: "No date" },
-  ].map((v) => ({ ...v, count: v.key === "all" ? allGroups.reduce((n, g) => n + g.items.length, 0) : allGroups.find((g) => g.key === v.key)?.items.length ?? 0 }));
+    { key: "done", label: "Done today" },
+  ].map((v) => ({
+    ...v,
+    count:
+      v.key === "all"
+        ? allGroups.reduce((n, g) => n + g.items.length, 0)
+        : v.key === "done"
+          ? cleared.length
+          : allGroups.find((g) => g.key === v.key)?.items.length ?? 0,
+  }));
+  const showingDone = view === "done";
 
   const meetingCount = tasks.filter((t) => t.kind === "call_today" || t.kind === "call_upcoming").length;
 
@@ -130,8 +154,9 @@ export default async function ScheduledTasksPage({ searchParams }: PageProps<"/t
           ))}
         </div>
 
-        {/* What kind of thing it is — the secondary split. */}
-        <div className="flex flex-col gap-3 border-b border-border px-6 py-4 sm:flex-row sm:items-center sm:justify-between">
+        {/* What kind of thing it is — the secondary split. Not on "Done today",
+            which is a log of what happened rather than a list to filter. */}
+        {!showingDone && <div className="flex flex-col gap-3 border-b border-border px-6 py-4 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex flex-wrap items-center gap-1.5">
             {kinds.map((k) => (
               <Link
@@ -158,9 +183,21 @@ export default async function ScheduledTasksPage({ searchParams }: PageProps<"/t
           >
             Mine only
           </Link>
-        </div>
+        </div>}
 
-        {groups.length === 0 ? (
+        {showingDone ? (
+          cleared.length === 0 ? (
+            <p className="px-6 py-12 text-center text-sm text-muted-foreground">
+              Nothing logged yet today. Calls, notes, qualification updates and stage changes appear here as the team works.
+            </p>
+          ) : (
+            <ul className="divide-y divide-border px-6 py-2">
+              {cleared.map((c) => (
+                <ClearedRow key={c.id} item={c} timeZone={tz} />
+              ))}
+            </ul>
+          )
+        ) : groups.length === 0 ? (
           <p className="px-6 py-12 text-center text-sm text-muted-foreground">
             {view === "all"
               ? "Nothing scheduled and nothing outstanding. Every opportunity has an owner and qualification is complete."
@@ -192,6 +229,12 @@ export default async function ScheduledTasksPage({ searchParams }: PageProps<"/t
         )}
       </section>
 
+      {showingDone && cleared.length > 0 && (
+        <p className="mt-3 text-[12px] text-muted-foreground">
+          Read from the activity timeline — the same records the opportunity shows. Automated entries (routing, the first AI brief) are left out.
+        </p>
+      )}
+
       <p className="mt-3 text-[12px] text-muted-foreground">
         Calendar settings and the full booking history live on the{" "}
         <Link href="/schedule" className="font-medium text-primary hover:underline">
@@ -200,5 +243,28 @@ export default async function ScheduledTasksPage({ searchParams }: PageProps<"/t
         page.
       </p>
     </div>
+  );
+}
+
+/** One thing that got done today: when, on which opportunity, and by whom. */
+function ClearedRow({ item, timeZone }: { item: ClearedItem; timeZone: string }) {
+  return (
+    <li className="py-2.5">
+      <Link href={`/leads/${item.leadId}`} className="group flex items-start gap-3">
+        <span className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-success/10 text-success">
+          <CheckCircle2 className="h-3.5 w-3.5" />
+        </span>
+        <span className="min-w-0 flex-1">
+          <span className="flex items-baseline justify-between gap-3">
+            <span className="truncate text-[13px] font-semibold text-foreground group-hover:text-primary">{item.companyName}</span>
+            <span className="shrink-0 text-[11px] uppercase tracking-wide text-muted-foreground">{ACTIVITY_TYPE_LABELS[item.type]}</span>
+          </span>
+          {item.body && <span className="mt-0.5 line-clamp-2 block text-[12px] text-muted-foreground">{item.body}</span>}
+          <span className="mt-0.5 block text-[11px] text-muted-foreground">
+            {item.actorName ?? "Someone"} · {formatInZone(new Date(item.occurredAt), timeZone, { withDate: false, withZone: false })}
+          </span>
+        </span>
+      </Link>
+    </li>
   );
 }

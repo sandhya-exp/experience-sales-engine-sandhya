@@ -65,3 +65,55 @@ export async function listActivityFeed(limit = 300): Promise<ActivityFeedRow[]> 
     [limit]
   );
 }
+
+export interface ClearedItem {
+  id: string;
+  leadId: string;
+  companyName: string;
+  type: ActivityType;
+  body: string | null;
+  actorName: string | null;
+  occurredAt: string;
+}
+
+/**
+ * What the team has actually done since a moment — the other half of a task
+ * list. Scheduled Tasks shows what is outstanding, which means a rep who has
+ * just cleared five things sees no evidence of it; this reads the same
+ * timeline from the other end.
+ *
+ * Only work a person did: automated records (routing, the first AI brief,
+ * the inquiry itself) are logged as "System" and left out, because nobody
+ * cleared them.
+ */
+export async function listClearedSince(since: Date, limit = 50): Promise<ClearedItem[]> {
+  const rows = await query<{
+    id: string;
+    lead_id: string;
+    company_name: string;
+    type: ActivityType;
+    body: string | null;
+    actor_name: string | null;
+    occurred_at: string;
+  }>(
+    `select a.id, a.lead_id, c.name as company_name, a.type, a.body, a.actor_name, a.occurred_at
+     from activities a
+     join leads l on l.id = a.lead_id
+     join companies c on c.id = l.company_id
+     where a.occurred_at >= $1
+       and coalesce(a.actor_name, 'System') <> 'System'
+       and coalesce(a.metadata->>'kind', '') not in ('assignment')
+     order by a.occurred_at desc
+     limit $2`,
+    [since.toISOString(), limit]
+  );
+  return rows.map((r) => ({
+    id: r.id,
+    leadId: r.lead_id,
+    companyName: r.company_name,
+    type: r.type,
+    body: r.body,
+    actorName: r.actor_name,
+    occurredAt: r.occurred_at,
+  }));
+}

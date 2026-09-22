@@ -92,6 +92,9 @@ export async function updateLeadStatus(id: string, status: LeadStatus, actorName
       type: "status_change",
       body: `Stage changed from ${previous.status} to ${status}.`,
       actorName,
+      // Structured too, so "how many reached Qualified last week" is a query
+      // rather than a string match on the sentence above.
+      metadata: { kind: "status_change", from: previous.status, to: status },
     });
   }
   return updated as Lead;

@@ -21,6 +21,7 @@ import { TASK_KIND_LABELS, type SalesTask, type TaskKind } from "@/lib/tasks";
 import type { InsightBuckets } from "@/lib/insights";
 import type { ScheduledItem } from "@/lib/repo/schedule";
 import type { CalendarStatus } from "@/lib/calendar/status";
+import { formatInZone } from "@/lib/calendar/time";
 import type { Activity } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
@@ -153,23 +154,80 @@ export function TaskRow({ task }: { task: SalesTask }) {
 
 /* --------------------------------------------------------------- meetings */
 
-export function MeetingsPanel({ meetings, status, limit = 4 }: { meetings: ScheduledItem[]; status: CalendarStatus; limit?: number }) {
-  const shown = meetings.slice(0, limit);
+/**
+ * Today, as a timeline rather than a list of the next four calls.
+ *
+ * "What does my day look like" is the first question someone asks at 9am, and
+ * a list of rows answers it only after you read every row. Times run down the
+ * left, the calls sit against them, a line marks now, and anything already
+ * past is dimmed — so the shape of the day is legible before any reading.
+ * Beyond today it says how many are booked and links to the week.
+ */
+export function TodayPanel({
+  meetings,
+  status,
+  timeZone,
+}: {
+  meetings: ScheduledItem[];
+  status: CalendarStatus;
+  timeZone: string;
+}) {
+  const now = new Date();
+  const todayKey = now.toLocaleDateString("en-CA", { timeZone });
+  const today = meetings.filter((m) => new Date(m.scheduledFor).toLocaleDateString("en-CA", { timeZone }) === todayKey);
+  const later = meetings.filter((m) => !today.includes(m));
+
   return (
     <Panel
-      label="Schedule"
-      title={meetings.length === 0 ? "No calls booked" : `${meetings.length} call${meetings.length === 1 ? "" : "s"} coming up`}
-      question="What meetings are coming, and with whom?"
+      label="Today"
+      title={today.length === 0 ? "Nothing booked today" : `${today.length} call${today.length === 1 ? "" : "s"} today`}
+      question="What does today look like?"
       icon={CalendarDays}
-      action={{ href: "/tasks", label: "Scheduled Tasks" }}
+      action={{ href: "/schedule", label: "Open the week" }}
     >
       <CalendarBadge status={status} />
-      {shown.length === 0 && <p className="py-3 text-[13px] text-muted-foreground">Customers book discovery calls from Talk to Sales; reps can schedule one from any opportunity.</p>}
-      <ul className="mt-1 divide-y divide-border">
-        {shown.map((m) => (
-          <MeetingRow key={m.activityId} meeting={m} />
-        ))}
-      </ul>
+      {today.length === 0 ? (
+        <p className="py-3 text-[13px] text-muted-foreground">
+          No discovery calls on the calendar for today.
+          {later.length > 0 && ` ${later.length} booked further out.`}
+        </p>
+      ) : (
+        <ol className="mt-1">
+          {today.map((m) => {
+            const at = new Date(m.scheduledFor);
+            const past = at.getTime() < now.getTime();
+            return (
+              <li key={m.activityId} className="flex gap-3">
+                {/* time gutter + rail */}
+                <div className="flex w-16 shrink-0 flex-col items-end">
+                  <span className={cn("text-[12px] font-medium tabular-nums", past ? "text-muted-foreground" : "text-foreground")}>
+                    {formatInZone(at, timeZone, { withDate: false, withZone: false })}
+                  </span>
+                </div>
+                <div className="relative flex flex-col items-center">
+                  <span className={cn("mt-1.5 h-2 w-2 shrink-0 rounded-full", past ? "bg-border" : "bg-primary")} />
+                  <span className="w-px flex-1 bg-border" />
+                </div>
+                <Link href={`/leads/${m.leadId}`} className="group min-w-0 flex-1 pb-3">
+                  <p className={cn("truncate text-[13px] font-semibold group-hover:text-primary", past ? "text-muted-foreground" : "text-foreground")}>
+                    {m.companyName}
+                  </p>
+                  <p className="truncate text-[12px] text-muted-foreground">
+                    {m.title}
+                    {m.contactName ? ` · ${m.contactName}` : ""}
+                    {m.ownerName ? ` · ${m.ownerName}` : ""}
+                  </p>
+                </Link>
+              </li>
+            );
+          })}
+        </ol>
+      )}
+      {today.length > 0 && later.length > 0 && (
+        <p className="border-t border-border pt-2 text-[12px] text-muted-foreground">
+          {later.length} more booked after today.
+        </p>
+      )}
     </Panel>
   );
 }
@@ -236,7 +294,7 @@ export function AiInsightsPanel({ buckets, canContract = true }: { buckets: Insi
     // a Sales User gets the qualified count in its place, which is the same
     // opportunities read from their side of the line.
     canContract
-      ? { key: "ready", label: `Ready for ${DOWNSTREAM.name}`, count: buckets.ready.length, href: DOWNSTREAM.route, tone: "ok" as const }
+      ? { key: "ready", label: "Ready to hand over", count: buckets.ready.length, href: DOWNSTREAM.route, tone: "ok" as const }
       : { key: "ready", label: "Fully qualified", count: buckets.ready.length, href: "/pipeline?stage=qualified", tone: "ok" as const },
   ];
   const conflict = buckets.contradictions[0];

@@ -12,7 +12,10 @@ import { buildInsights, bucketInsights } from "@/lib/insights";
 import { buildTasks, tasksForRole } from "@/lib/tasks";
 import { StatsStrip } from "@/components/dashboard/stats-strip";
 import { NeedsAttentionPanel } from "@/components/dashboard/side-panels";
-import { AiInsightsPanel, MeetingsPanel, NextActionsPanel, QuoteReadyPanel, RecentActivitySummary, TasksPanel } from "@/components/dashboard/home-cards";
+import { AiInsightsPanel, NextActionsPanel, QuoteReadyPanel, RecentActivitySummary, TasksPanel, TodayPanel } from "@/components/dashboard/home-cards";
+import { ThroughputStrip } from "@/components/dashboard/throughput-strip";
+import { periodStart, throughputSince, THROUGHPUT_PERIODS, type ThroughputPeriod } from "@/lib/repo/throughput";
+import { schedulingConfig } from "@/lib/calendar/config";
 import { getCurrentUser } from "@/lib/auth";
 import { canAccessContract } from "@/lib/roles";
 
@@ -25,8 +28,10 @@ import { canAccessContract } from "@/lib/roles";
  * AI-brief and calendar data — no new entities, no charts, no vanity metrics —
  * and every row opens the opportunity where the work actually happens.
  */
-export default async function HomePage() {
-  const [rows, user, briefs, recent, upcoming, overdue, calendar] = await Promise.all([
+export default async function HomePage({ searchParams }: PageProps<"/">) {
+  const params = await searchParams;
+  const period: ThroughputPeriod = THROUGHPUT_PERIODS.some((p) => p.key === params.period) ? (params.period as ThroughputPeriod) : "7d";
+  const [rows, user, briefs, recent, upcoming, overdue, calendar, throughput] = await Promise.all([
     listLeadRows(),
     getCurrentUser(),
     listLatestBriefs(),
@@ -34,6 +39,7 @@ export default async function HomePage() {
     listUpcomingMeetings(20),
     listOverdueMeetings(20),
     calendarStatus(),
+    throughputSince(periodStart(period)),
   ]);
 
   const firstName = user?.name.split(" ")[0];
@@ -84,10 +90,13 @@ export default async function HomePage() {
       <StatsStrip counts={counts} activeStage="all" />
       <p className="mt-2.5 text-[13px] text-muted-foreground">{summary.join(" · ")}</p>
 
+      {/* Flow beside the snapshot: what actually moved in the period. */}
+      <ThroughputStrip throughput={throughput} period={period} />
+
       {/* The working cards: what needs you, what to do, what's booked, what the AI found. */}
       <div className="mt-6 grid items-start gap-4 lg:grid-cols-2">
         <TasksPanel tasks={tasks} />
-        <MeetingsPanel meetings={upcoming} status={calendar} />
+        <TodayPanel meetings={upcoming} status={calendar} timeZone={schedulingConfig().timeZone} />
         <AiInsightsPanel buckets={buckets} canContract={canContract} />
         <NextActionsPanel buckets={buckets} />
         {canContract && <QuoteReadyPanel buckets={buckets} />}

@@ -2,7 +2,7 @@
 
 import { useMemo, useState, useTransition } from "react";
 import { toast } from "sonner";
-import { AlertTriangle, Copy, FilePlus2, Pencil, Plus, ShieldCheck, Sparkles, Trash2 } from "lucide-react";
+import { AlertTriangle, Circle, Copy, FilePlus2, Pencil, Plus, ShieldCheck, Sparkles, Trash2 } from "lucide-react";
 import { format, addDays } from "date-fns";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -13,8 +13,10 @@ import { createQuoteAction, draftNarrativeAction, updateDraftAction } from "@/ap
 import type { QuoteNarrative } from "@/lib/ai/narrative";
 import { computeTotals, endOfTerm, lineNet, netUnitPrice, type QuoteLineItem } from "@/lib/quotes/math";
 import type { QuoteMeta } from "@/lib/repo/quotes";
-import { lineApproval, type DiscountRules } from "@/lib/quotes/rules";
+import { lineApproval, uncoveredRequirements, type DiscountRules } from "@/lib/quotes/rules";
 import { cn } from "@/lib/utils";
+import type { Lead } from "@/lib/types";
+import type { OpportunityIntelligence } from "@/lib/ai/intelligence";
 
 /**
  * The quote line editor.
@@ -42,6 +44,8 @@ export function QuoteFormDialog({
   rules,
   targetAmount,
   companyName,
+  lead,
+  intelligence,
 }: {
   leadId: string;
   existing?: QuoteMeta | null;
@@ -51,6 +55,12 @@ export function QuoteFormDialog({
   /** What the customer said they had, when they said a figure. */
   targetAmount?: number | null;
   companyName?: string;
+  /** For the live uncovered-requirement check below the line items — same
+   * record the AI note and the saved quote's review card already check
+   * against, just run here too so a rep sees it while still typing, not only
+   * after they save and look back. */
+  lead: Lead;
+  intelligence: OpportunityIntelligence | null;
 }) {
   const [open, setOpen] = useState(false);
   const [pending, start] = useTransition();
@@ -81,6 +91,14 @@ export function QuoteFormDialog({
   const approval = [lineApproval(totals.discount_pct, rules), ...items.map((it) => lineApproval(it.discount_pct, rules))].reduce((worst, a) =>
     RANK[a] > RANK[worst] ? a : worst
   , "ok" as ApprovalLevel);
+
+  // The same check the saved quote's review card runs, just live: a rep should
+  // see "you priced the wrong thing" while the lines are still open, not after
+  // Create draft, and not only buried in the AI note's grounding line.
+  const notCovered = useMemo(
+    () => uncoveredRequirements({ items: items.filter((it) => it.description.trim()), lead, intelligence }),
+    [items, lead, intelligence]
+  );
 
   const set = (i: number, patch: Partial<QuoteLineItem>) => setItems((cur) => cur.map((it, idx) => (idx === i ? { ...it, ...patch } : it)));
 
@@ -258,6 +276,20 @@ export function QuoteFormDialog({
               <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
               <span>
                 At {totals.discount_pct}% this needs {approval === "admin" ? "a sales manager and an admin" : "a sales manager"} to approve before it can go to the customer. A rep may give up to {rules.managerPct}% alone.
+              </span>
+            </p>
+          )}
+
+          {/* What this quote does not price — computed live from the same
+              function the saved quote's review card and the AI note both read,
+              so a rep sees it while the lines are still open, not after saving. */}
+          {notCovered.length > 0 && (
+            <p className="flex items-start gap-2 rounded-md border border-border bg-card px-2.5 py-2 text-[12.5px]">
+              <Circle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+              <span className="text-foreground">
+                <span className="font-medium">Not priced here: </span>
+                {notCovered.join(", ")}.{" "}
+                <span className="text-muted-foreground">The customer asked about {notCovered.length === 1 ? "this" : "these"} — add a line or say why it&rsquo;s out of scope before this goes out.</span>
               </span>
             </p>
           )}

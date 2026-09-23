@@ -8,13 +8,29 @@ import { chainComplete, discountRules, pendingStep } from "@/lib/quotes/rules";
 import { parseBudget } from "@/lib/quotes/review";
 import { cn } from "@/lib/utils";
 import type { Company, Lead } from "@/lib/types";
+import type { OpportunityIntelligence } from "@/lib/ai/intelligence";
 
 /**
  * Quotes on an opportunity — the versions as one table, the active one open
  * for review with its check and its actions. Compact on purpose: a rep should
  * see "v2, $14,400, sent Tuesday, waiting on Dana" without scrolling.
  */
-export function QuotesTab({ leadId, lead, company, quotes, isAdmin }: { leadId: string; lead: Lead; company: Company; quotes: QuoteRow[]; isAdmin: boolean }) {
+export function QuotesTab({
+  leadId,
+  lead,
+  company,
+  quotes,
+  isAdmin,
+  intelligence,
+}: {
+  leadId: string;
+  lead: Lead;
+  company: Company;
+  quotes: QuoteRow[];
+  isAdmin: boolean;
+  /** Passed through to the line editor so it can flag an uncovered requirement live, before save. */
+  intelligence: OpportunityIntelligence | null;
+}) {
   const active = activeQuote(quotes);
   const status = active ? effectiveStatus(active.meta) : null;
   // The editor runs in the browser, so the thresholds and the customer's own
@@ -36,9 +52,9 @@ export function QuotesTab({ leadId, lead, company, quotes, isAdmin }: { leadId: 
           </CardTitle>
           <div className="flex gap-2">
             {active?.meta.status === "draft" && (
-              <QuoteFormDialog leadId={leadId} existing={active.meta} activityId={active.activityId} trigger="edit" rules={rules} targetAmount={target} companyName={company.name} />
+              <QuoteFormDialog leadId={leadId} existing={active.meta} activityId={active.activityId} trigger="edit" rules={rules} targetAmount={target} companyName={company.name} lead={lead} intelligence={intelligence} />
             )}
-            <QuoteFormDialog leadId={leadId} existing={active?.meta ?? null} rules={rules} targetAmount={target} companyName={company.name} />
+            <QuoteFormDialog leadId={leadId} existing={active?.meta ?? null} rules={rules} targetAmount={target} companyName={company.name} lead={lead} intelligence={intelligence} />
           </div>
         </CardHeader>
         <CardContent className="pt-0">

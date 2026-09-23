@@ -69,7 +69,7 @@ export default async function LeadWorkspacePage({ params, searchParams }: PagePr
           contacts={<ContactsTab leadId={lead.id} companyId={company.id} contacts={contacts} />}
           activity={<ActivityTab leadId={lead.id} activities={activities} briefs={briefHistory} quotes={quotes} leadCreatedAt={lead.created_at} companyName={company.name} />}
           qualification={<QualificationTab lead={lead} contacts={contacts} focus={focus} />}
-          quotes={<QuotesTab leadId={lead.id} lead={lead} company={company} quotes={quotes} isAdmin={canApprove} />}
+          quotes={<QuotesTab leadId={lead.id} lead={lead} company={company} quotes={quotes} isAdmin={canApprove} intelligence={hasIntelligence(brief) ? brief.intelligence : null} />}
           brief={
             <AiBriefTab
               leadId={lead.id}

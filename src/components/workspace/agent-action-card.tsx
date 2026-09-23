@@ -85,9 +85,9 @@ export function AgentActionCard({
       <CardHeader className="flex-row items-center justify-between space-y-0">
         <CardTitle className="flex items-center gap-2">
           <span className="flex h-6 w-6 items-center justify-center rounded-md bg-navy text-white">
-            <Bot className="h-3.5 w-3.5" />
+            <Sparkles className="h-3.5 w-3.5" />
           </span>
-          AI Actions
+          Recommended Action
           <RiskBadge risk={meta.risk} />
           <StateBadge state={meta.state} />
         </CardTitle>
@@ -106,57 +106,59 @@ export function AgentActionCard({
           </p>
         )}
 
-        {/* What to do next. */}
+        {/* Reason → recommendation → artifact → approval, as one workflow: the
+            goal, why and evidence are the reasoning; the email (when there is
+            one) is the artifact that reasoning produced, previewed compactly
+            right here rather than in a section a reader has to scroll to. */}
         <div className={cn("rounded-xl border p-4", executed ? "border-success/30 bg-success/5" : meta.risk === "red" ? "border-destructive/30 bg-destructive/5" : "border-navy/20 bg-[#eef2fb]")}>
-          <p className="section-label text-navy">Next action</p>
-          <p className="mt-1 text-[15px] font-semibold leading-snug text-foreground">{meta.goal}</p>
+          <p className="text-[17px] font-semibold leading-snug text-foreground">{meta.goal}</p>
 
-      <dl className="mt-3 grid gap-x-6 gap-y-2.5 sm:grid-cols-2">
-        <Field label="Why this action">{meta.rationale}</Field>
-        <Field label="Automation">
-          <span className={cn(meta.risk === "green" ? "text-success" : meta.risk === "red" ? "text-destructive" : "text-foreground")}>{RISK_TEXT[meta.risk]}</span>
-        </Field>
-        {meta.evidence.length > 0 && (
-          <div className="sm:col-span-2">
-            <dt className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Evidence</dt>
-            <dd className="mt-1 flex flex-wrap gap-1.5">
-              {meta.evidence.map((e, i) => (
-                <span key={i} className="rounded-md border border-border bg-card px-2 py-1 text-[12px] text-foreground">
-                  {e.claim} <span className="text-muted-foreground">· {sourceLabel(e.source)}</span>
-                </span>
-              ))}
-            </dd>
-          </div>
-        )}
-      </dl>
+          <dl className="mt-3 grid gap-x-6 gap-y-2.5 sm:grid-cols-2">
+            <Field label="Why this action">{meta.rationale}</Field>
+            <Field label="Automation">
+              <span className={cn(meta.risk === "green" ? "text-success" : meta.risk === "red" ? "text-destructive" : "text-foreground")}>{RISK_TEXT[meta.risk]}</span>
+            </Field>
+            {meta.evidence.length > 0 && (
+              <div className="sm:col-span-2">
+                <dt className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Evidence</dt>
+                <dd className="mt-1 flex flex-wrap gap-1.5">
+                  {meta.evidence.map((e, i) => (
+                    <span key={i} className="rounded-md border border-border bg-card px-2 py-1 text-[12px] text-foreground">
+                      {e.claim} <span className="text-muted-foreground">· {sourceLabel(e.source)}</span>
+                    </span>
+                  ))}
+                </dd>
+              </div>
+            )}
+          </dl>
 
-      {meta.draft_message && <MessageBlock leadId={leadId} action={action} providerLabel={providerLabel} />}
+          {meta.draft_message && <ProposedEmailBlock leadId={leadId} action={action} providerLabel={providerLabel} />}
 
-      {!meta.draft_message && !executed && meta.state !== "declined" && (
-        <div className="mt-3 flex flex-wrap gap-2">
-          <Button size="sm" disabled={pending} onClick={() => startTransition(async () => { toast.message((await approveAgentAction(action.activityId)).detail); })}>
-            <CheckCircle2 className="h-3.5 w-3.5" /> Accept this action
-          </Button>
-          <Button size="sm" variant="ghost" disabled={pending} onClick={() => startTransition(async () => { toast.message((await declineAgentActionAction(action.activityId)).detail); })}>
-            <X className="h-3.5 w-3.5" /> Not now
-          </Button>
-        </div>
-      )}
-
-      {executed && (
-        <div className="mt-3 rounded-lg border border-border bg-card px-3 py-2.5">
-          <p className="flex items-center gap-2 text-[13px] font-medium text-foreground">
-            <CheckCircle2 className="h-4 w-4 text-success" />
-            {meta.trace.result ?? "Done."}
-          </p>
-          {meta.executed_at && <p className="mt-0.5 pl-6 text-[12px] text-muted-foreground">{new Date(meta.executed_at).toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}{meta.auto ? " · executed automatically" : ""}</p>}
-          {waiting && (
-            <p className="mt-1.5 flex items-center gap-1.5 pl-6 text-[12px] text-muted-foreground">
-              <Clock className="h-3.5 w-3.5" /> Waiting for the customer to reply.
-            </p>
+          {!meta.draft_message && !executed && meta.state !== "declined" && (
+            <div className="mt-3 flex flex-wrap gap-2">
+              <Button size="sm" disabled={pending} onClick={() => startTransition(async () => { toast.message((await approveAgentAction(action.activityId)).detail); })}>
+                <CheckCircle2 className="h-3.5 w-3.5" /> Accept this action
+              </Button>
+              <Button size="sm" variant="ghost" disabled={pending} onClick={() => startTransition(async () => { toast.message((await declineAgentActionAction(action.activityId)).detail); })}>
+                <X className="h-3.5 w-3.5" /> Not now
+              </Button>
+            </div>
           )}
-        </div>
-      )}
+
+          {executed && (
+            <div className="mt-3 rounded-lg border border-border bg-card px-3 py-2.5">
+              <p className="flex items-center gap-2 text-[13px] font-medium text-foreground">
+                <CheckCircle2 className="h-4 w-4 text-success" />
+                {meta.trace.result ?? "Done."}
+              </p>
+              {meta.executed_at && <p className="mt-0.5 pl-6 text-[12px] text-muted-foreground">{new Date(meta.executed_at).toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}{meta.auto ? " · executed automatically" : ""}</p>}
+              {waiting && (
+                <p className="mt-1.5 flex items-center gap-1.5 pl-6 text-[12px] text-muted-foreground">
+                  <Clock className="h-3.5 w-3.5" /> Waiting for the customer to reply.
+                </p>
+              )}
+            </div>
+          )}
 
           {waiting && <ReplyBox leadId={leadId} inReplyTo={action.activityId} />}
         </div>
@@ -169,50 +171,77 @@ export function AgentActionCard({
   );
 }
 
-/* ----------------------------------------------------------------- message */
+/* ------------------------------------------------------------------- email */
 
-function MessageBlock({ leadId, action, providerLabel }: { leadId: string; action: AgentActionRow; providerLabel: string }) {
+/**
+ * Proposed email — the artifact the reasoning above produced, previewed
+ * compactly right inside the same card. Collapsed, it shows only what's
+ * needed to decide: who it's to, the subject, and a couple of lines of body,
+ * with Send / Edit / Decline always visible so approving doesn't require
+ * expanding anything. "Preview" reveals the full body inline; editing forces
+ * it open. Same data and server actions as before — only the layout changed.
+ */
+function ProposedEmailBlock({ leadId, action, providerLabel }: { leadId: string; action: AgentActionRow; providerLabel: string }) {
   const { meta } = action;
   const draft = meta.draft_message!;
   const [editing, setEditing] = useState(false);
+  const [expanded, setExpanded] = useState(false);
   const [subject, setSubject] = useState(draft.subject);
   const [body, setBody] = useState(draft.body);
   const [pending, startTransition] = useTransition();
   const done = meta.state === "executed";
   const failed = meta.delivery?.state === "failed";
+  const showFull = expanded || editing;
   void leadId;
 
+  const fullBody = done ? draft.body : body;
+  const preview = fullBody
+    .split("\n")
+    .map((l) => l.trim())
+    .filter(Boolean)
+    .slice(0, 2)
+    .join(" ");
+
   return (
-    <div className="mt-3 overflow-hidden rounded-lg border border-border bg-card">
-      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border px-3 py-2">
-        <p className="flex items-center gap-1.5 text-[12px] font-medium text-foreground">
-          <Mail className="h-3.5 w-3.5 text-navy" /> To {draft.to.name ?? draft.to.email} <span className="text-muted-foreground">· {draft.to.email}</span>
+    <div className="mt-3 overflow-hidden rounded-lg border-2 border-navy/25 bg-card shadow-sm">
+      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-navy/15 bg-[#eef2fb] px-3 py-1.5">
+        <p className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-navy">
+          <Mail className="h-3 w-3" /> Proposed email
         </p>
         <div className="flex items-center gap-1.5">
           <Badge variant={draft.generated_by === "claude" ? "navy" : "outline"} className="font-medium" title={draft.generated_by === "claude" ? `Written by Claude (${draft.model}) and checked against the record` : "Written by the deterministic engine"}>
             {draft.generated_by === "claude" ? `Claude${draft.model ? ` · ${draft.model.replace(/^claude-/, "")}` : ""}` : "Deterministic"}
           </Badge>
           {meta.delivery && <DeliveryBadge state={meta.delivery.state} />}
+          <Button size="sm" variant="ghost" className="h-6 px-2 text-[11px]" disabled={editing} onClick={() => setExpanded((e) => !e)}>
+            {showFull ? "Collapse" : "Preview"}
+          </Button>
         </div>
       </div>
 
       <div className="px-3 py-2.5">
-        {editing ? (
-          <div className="space-y-2">
-            <div>
-              <Label htmlFor="agent-subject" className="text-[12px]">Subject</Label>
-              <Input id="agent-subject" value={subject} onChange={(e) => setSubject(e.target.value)} />
+        <p className="text-[13px] font-semibold text-foreground">{done ? draft.subject : subject}</p>
+        <p className="mt-0.5 text-[11.5px] text-muted-foreground">
+          To {draft.to.name ?? draft.to.email} <span>· {draft.to.email}</span>
+        </p>
+
+        {showFull ? (
+          editing ? (
+            <div className="mt-2 space-y-2">
+              <div>
+                <Label htmlFor="agent-subject" className="text-[12px]">Subject</Label>
+                <Input id="agent-subject" value={subject} onChange={(e) => setSubject(e.target.value)} />
+              </div>
+              <div>
+                <Label htmlFor="agent-body" className="text-[12px]">Message</Label>
+                <Textarea id="agent-body" rows={10} value={body} onChange={(e) => setBody(e.target.value)} />
+              </div>
             </div>
-            <div>
-              <Label htmlFor="agent-body" className="text-[12px]">Message</Label>
-              <Textarea id="agent-body" rows={10} value={body} onChange={(e) => setBody(e.target.value)} />
-            </div>
-          </div>
+          ) : (
+            <p className="mt-2 whitespace-pre-wrap text-[13px] leading-relaxed text-foreground">{fullBody}</p>
+          )
         ) : (
-          <>
-            <p className="text-[13px] font-semibold text-foreground">{done ? draft.subject : subject}</p>
-            <p className="mt-1.5 whitespace-pre-wrap text-[13px] leading-relaxed text-foreground">{done ? draft.body : body}</p>
-          </>
+          <p className="mt-1.5 truncate text-[12.5px] leading-snug text-muted-foreground">{preview}</p>
         )}
       </div>
 
@@ -238,7 +267,15 @@ function MessageBlock({ leadId, action, providerLabel }: { leadId: string; actio
           >
             <Send className="h-3.5 w-3.5" /> {meta.risk === "green" ? "Send" : "Approve & send"}
           </Button>
-          <Button size="sm" variant="outline" disabled={pending} onClick={() => setEditing((e) => !e)}>
+          <Button
+            size="sm"
+            variant="outline"
+            disabled={pending}
+            onClick={() => {
+              setEditing((e) => !e);
+              setExpanded(true);
+            }}
+          >
             <Pencil className="h-3.5 w-3.5" /> {editing ? "Done editing" : "Edit"}
           </Button>
           <Button size="sm" variant="ghost" disabled={pending} onClick={() => startTransition(async () => { toast.message((await declineAgentActionAction(action.activityId)).detail); })}>

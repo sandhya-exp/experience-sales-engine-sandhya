@@ -11,6 +11,7 @@ import { scheduleFollowUp, nextFollowUpFor, type FollowUpCalendar } from "@/lib/
 import { schedulingConfig } from "@/lib/calendar/config";
 import { getCalendarProvider, verifySlot } from "@/lib/calendar/index";
 import { isMeetingDuration } from "@/lib/calendar/recommend";
+import { CONFERENCING, CONFERENCE_LABEL, type ConferenceKey } from "@/lib/calendar/conferencing";
 import { refreshOpportunity } from "@/lib/ai/agent";
 import { formatInZone } from "@/lib/calendar/time";
 import type { Company } from "@/lib/types";
@@ -30,8 +31,7 @@ import type { Company } from "@/lib/types";
  * application; rather than pretend, the rep pastes their own room link and it is
  * attached to the event and the invitation.
  */
-const CONFERENCE_KINDS = ["meet", "zoom", "teams", "none"] as const;
-type ConferenceKind = (typeof CONFERENCE_KINDS)[number];
+const CONFERENCE_KINDS = CONFERENCING.map((c) => c.key) as [ConferenceKey, ...ConferenceKey[]];
 
 const schema = z.object({
   leadId: z.string().uuid("Choose an opportunity."),
@@ -63,7 +63,7 @@ export async function createScheduleAction(formData: FormData): Promise<Schedule
   if (!parsed.success) return { ok: false, detail: parsed.error.issues[0]?.message ?? "Check the form and try again." };
   const input = parsed.data;
 
-  const kind = input.conference as ConferenceKind;
+  const kind = input.conference as ConferenceKey;
   // A pasted link is required for the two this app cannot create, and it has to
   // look like one — an empty box would silently produce a meeting nobody can join.
   if ((kind === "zoom" || kind === "teams") && !/^https?:\/\/\S+$/i.test(input.conferenceUrl ?? "")) {
@@ -168,6 +168,6 @@ export async function createScheduleAction(formData: FormData): Promise<Schedule
   };
 }
 
-function labelFor(kind: ConferenceKind) {
-  return kind === "meet" ? "Google Meet" : kind === "zoom" ? "Zoom" : kind === "teams" ? "Microsoft Teams" : "No video link";
+function labelFor(kind: ConferenceKey) {
+  return CONFERENCE_LABEL[kind];
 }

@@ -38,6 +38,9 @@ export function formatScheduledTime(iso: string | Date): string {
 /** Timeline label for one activity — a booked follow-up reads "Call booked", not "Call". */
 export function activityLabel(type: ActivityType, metadata?: Record<string, unknown> | null): string {
   if (metadata?.kind === "follow_up") return metadata.completed ? "Call completed" : "Call booked";
+  if (metadata?.kind === "call_recap") return "Call processed with AI";
+  if (metadata?.kind === "booking_confirmation_email") return "Booking confirmation email";
+  if (metadata?.kind === "booking_confirmation_sms") return "Booking confirmation text";
   return ACTIVITY_TYPE_LABELS[type];
 }
 

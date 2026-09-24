@@ -6,6 +6,7 @@ import { getCurrentUser } from "@/lib/auth";
 import { scheduleFollowUp, completeFollowUp } from "@/lib/repo/followups";
 import { bookDiscoveryCall } from "@/lib/calendar/booking";
 import { isMeetingDuration } from "@/lib/calendar/recommend";
+import { isConferenceKey } from "@/lib/calendar/conferencing";
 import { refreshOpportunity } from "@/lib/ai/agent";
 
 /**
@@ -41,7 +42,24 @@ export async function bookCustomerSlotAction(leadId: string, formData: FormData)
   const minutes = isMeetingDuration(rawMinutes) ? rawMinutes : undefined;
   if (Number.isNaN(start.getTime())) redirect(`/inquire/thank-you?lead=${leadId}&error=slot`);
 
-  const result = await bookDiscoveryCall({ leadId, start, customerTimeZone: timeZone, minutes });
+  const repId = String(formData.get("repId") ?? "").trim() || null;
+  const rawConference = String(formData.get("conference") ?? "").trim();
+  const conferenceKind = isConferenceKey(rawConference) ? rawConference : "meet";
+  const conferenceUrl = String(formData.get("conferenceUrl") ?? "").trim();
+  // A pasted link is required for the two this app cannot create, and it has
+  // to look like one — an empty box would silently produce a meeting nobody can join.
+  if ((conferenceKind === "zoom" || conferenceKind === "teams") && !/^https?:\/\/\S+$/i.test(conferenceUrl)) {
+    redirect(`/inquire/thank-you?lead=${leadId}&error=conference`);
+  }
+
+  const result = await bookDiscoveryCall({
+    leadId,
+    start,
+    customerTimeZone: timeZone,
+    minutes,
+    preferredRepId: repId,
+    conference: { kind: conferenceKind, url: conferenceUrl || null },
+  });
   if (!result.ok) {
     const code = result.reason === "slot_unavailable" ? "slot" : result.reason === "provider_error" ? "calendar" : "";
     redirect(`/inquire/thank-you?lead=${leadId}${code ? `&error=${code}` : ""}`);

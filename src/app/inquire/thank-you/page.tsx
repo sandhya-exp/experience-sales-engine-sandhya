@@ -1,6 +1,6 @@
 import Link from "next/link";
 import type { Metadata } from "next";
-import { Bot, Check, CheckCircle2, ExternalLink } from "lucide-react";
+import { Bot, Calendar, Check, CheckCircle2, ExternalLink, Video } from "lucide-react";
 import { ExperienceLogo } from "@/components/brand/logo";
 import { Button } from "@/components/ui/button";
 import { getLeadById } from "@/lib/repo/leads";
@@ -9,11 +9,20 @@ import { hasIntelligence } from "@/lib/ai/briefGuards";
 import { nextFollowUpFor } from "@/lib/repo/followups";
 import { BookingPanel } from "@/components/inquire/booking-panel";
 import { recommendMeeting } from "@/lib/calendar/recommend";
+import { CONFERENCE_LABEL, type ConferenceKey } from "@/lib/calendar/conferencing";
+import { googleCalendarAddLink } from "@/lib/calendar/addLink";
 import { formatInZone, isValidTimeZone } from "@/lib/calendar/time";
 import { schedulingConfig } from "@/lib/calendar/config";
 import { cn } from "@/lib/utils";
 
 export const metadata: Metadata = { title: "Book a call — Talk to Sales · Experience.com" };
+
+/** The customer-oriented version of "what's next" — three steps, in their language, not the system's. */
+const WHATS_NEXT = [
+  { title: "We review your request", body: "Your specialist reviews the information you shared." },
+  { title: "We meet", body: "We'll use the discovery call to understand your goals and requirements." },
+  { title: "We prepare your next step", body: "After the conversation, we'll follow up with the appropriate next steps." },
+];
 
 /**
  * Talk to Sales, step two: book the discovery call.
@@ -62,6 +71,7 @@ export default async function ThankYouPage({ searchParams }: PageProps<"/inquire
             provider={followUp?.calendar?.provider ?? null}
             invited={Boolean(followUp?.calendar?.invited)}
             htmlLink={followUp?.calendar?.html_link ?? null}
+            conference={followUp?.calendar?.conference ?? null}
             agenda={recommendation.agenda}
           />
         ) : canBook && lead ? (
@@ -127,6 +137,7 @@ function Confirmed({
   provider,
   invited,
   htmlLink,
+  conference,
   agenda,
 }: {
   when: Date;
@@ -137,66 +148,90 @@ function Confirmed({
   provider: string | null;
   invited: boolean;
   htmlLink: string | null;
+  conference?: { kind: ConferenceKey; url: string | null } | null;
   agenda: string[];
 }) {
+  const end = new Date(when.getTime() + durationMinutes * 60_000);
+  const meetingLabel = conference ? CONFERENCE_LABEL[conference.kind] : "Google Meet";
+  const joinLink = conference?.url ?? htmlLink;
+  const addToCalendarLink = googleCalendarAddLink({
+    title: `Discovery call · Experience.com`,
+    start: when,
+    end,
+    location: meetingLabel,
+    details: joinLink ? `Join: ${joinLink}` : undefined,
+  });
+
   return (
     <div className="mx-auto max-w-xl overflow-hidden rounded-[var(--radius)] border border-border bg-card card-shadow">
-      <div className="px-8 pt-10 text-center">
+      <div className="px-5 pt-8 text-center sm:px-8 sm:pt-10">
         <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-success/10">
           <CheckCircle2 className="h-7 w-7 text-success" />
         </div>
-        <h1 className="mt-4 text-[26px] font-bold tracking-tight text-foreground">Booking confirmed</h1>
+        <h1 className="mt-4 text-[24px] font-bold tracking-tight text-foreground sm:text-[26px]">You&rsquo;re all set</h1>
         <p className="mt-1 text-[14px] text-muted-foreground">
           {repName ? (
             <>
-              You&rsquo;re booked with <span className="font-medium text-foreground">{repName}</span>, Experience.com.
+              We&rsquo;ve scheduled your conversation with <span className="font-medium text-foreground">{repName}</span>, Experience.com.
             </>
           ) : (
-            <>You&rsquo;re booked with our sales team.</>
+            <>We&rsquo;ve scheduled your conversation with our sales team.</>
           )}
         </p>
 
-        <p className="mt-6 text-[20px] font-bold text-foreground">
-          {new Intl.DateTimeFormat("en-US", { timeZone: showTz, weekday: "long", month: "long", day: "numeric", year: "numeric" }).format(when)}
-        </p>
-        <p className="mt-0.5 text-[18px] font-semibold text-foreground">{formatInZone(when, showTz, { withDate: false })}</p>
-        <p className="mt-1 text-[13px] text-muted-foreground">
-          {durationMinutes} minutes
-          {showTz !== teamTz && <> · {formatInZone(when, teamTz, { withDate: false })} for our team</>}
-        </p>
+        <div className="mx-5 mt-6 space-y-2 rounded-lg border border-border bg-muted/30 px-4 py-3.5 text-left sm:mx-8">
+          <Row icon={<Calendar className="h-4 w-4 text-primary" />}>
+            <span className="font-semibold text-foreground">
+              {new Intl.DateTimeFormat("en-US", { timeZone: showTz, weekday: "long", month: "long", day: "numeric" }).format(when)}
+            </span>{" "}
+            · {formatInZone(when, showTz, { withDate: false })}
+            {showTz !== teamTz && <span className="text-muted-foreground"> ({formatInZone(when, teamTz, { withDate: false })} for our team)</span>}
+          </Row>
+          <Row icon={<Bot className="h-4 w-4 text-primary" />}>
+            {durationMinutes} minutes{repName ? ` with ${repName}` : ""}
+          </Row>
+          <Row icon={<Video className="h-4 w-4 text-primary" />}>{meetingLabel}</Row>
+        </div>
 
         <div className="mt-4 space-y-1.5 text-[13px]">
           {provider === "google" && invited && <p className="text-success">A calendar invitation is on its way to your email.</p>}
           {provider === "google" && !invited && <p className="text-muted-foreground">Our team will send the calendar invitation shortly.</p>}
-          {provider === "local" && (
-            <p className="inline-block rounded bg-warning/10 px-1.5 py-0.5 text-[11px] text-warning">Demo booking — Google Calendar is not configured, so no invitation was sent.</p>
-          )}
-          {htmlLink && (
-            <a href={htmlLink} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 font-medium text-primary hover:underline">
-              View in Google Calendar <ExternalLink className="h-3 w-3" />
+          <div className="flex flex-wrap items-center justify-center gap-x-4 gap-y-1">
+            <a href={addToCalendarLink} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 font-medium text-primary hover:underline">
+              Add to Google Calendar <ExternalLink className="h-3 w-3" />
             </a>
-          )}
+            {joinLink && (
+              <a href={joinLink} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 font-medium text-primary hover:underline">
+                View meeting details <ExternalLink className="h-3 w-3" />
+              </a>
+            )}
+          </div>
+          {provider === "local" && <p className="text-[11px] text-muted-foreground/70">Demo booking — no calendar invitation was sent.</p>}
         </div>
       </div>
 
-      {/* What the agent did the moment this was booked. Not a promise — the
-          preparation brief is written on the opportunity by the same pass. */}
-      <div className="mt-8 border-t border-border bg-muted/30 px-8 py-5 text-left">
-        <p className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-primary">
-          <Bot className="h-3.5 w-3.5" /> We&rsquo;re already preparing
-        </p>
-        <p className="mt-1.5 text-[13px] leading-relaxed text-foreground">
-          {agenda.length > 0 ? (
-            <>
-              Your enquiry has been summarised for the specialist you&rsquo;re meeting, along with the {agenda.length === 1 ? "one thing" : `${agenda.length} things`} we
-              still want to understand — so the call starts where your form left off.
-            </>
-          ) : (
-            <>Your enquiry has been summarised for the specialist you&rsquo;re meeting, so the call starts where your form left off.</>
-          )}
-        </p>
-        {agenda.length > 0 && (
-          <ul className="mt-2.5 space-y-1">
+      {/* What happens next, in the customer's language — not the system's. */}
+      <div className="mt-6 border-t border-border px-5 py-5 text-left sm:px-8">
+        <p className="section-label">What happens next</p>
+        <ol className="mt-2.5 space-y-2.5">
+          {WHATS_NEXT.map((step, i) => (
+            <li key={step.title} className="flex gap-2.5 text-[13px]">
+              <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-primary/10 text-[11px] font-semibold text-primary">{i + 1}</span>
+              <p className="leading-snug text-foreground">
+                <span className="font-semibold">{step.title}</span> — <span className="text-muted-foreground">{step.body}</span>
+              </p>
+            </li>
+          ))}
+        </ol>
+      </div>
+
+      {/* What the agent did the moment this was booked — kept, but compact. */}
+      {agenda.length > 0 && (
+        <div className="border-t border-border bg-muted/30 px-5 py-4 text-left sm:px-8">
+          <p className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-primary">
+            <Bot className="h-3.5 w-3.5" /> What we&rsquo;ll cover on the call
+          </p>
+          <ul className="mt-2 space-y-1">
             {agenda.map((item) => (
               <li key={item} className="flex gap-2 text-[13px] text-muted-foreground">
                 <span className="mt-[7px] h-1 w-1 shrink-0 rounded-full bg-primary/60" />
@@ -204,9 +239,18 @@ function Confirmed({
               </li>
             ))}
           </ul>
-        )}
-        <p className="mt-3 text-[12px] text-muted-foreground">Need a different time? Reply to the confirmation and we&rsquo;ll move it.</p>
-      </div>
+          <p className="mt-2.5 text-[12px] text-muted-foreground">Need a different time? Reply to the confirmation and we&rsquo;ll move it.</p>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function Row({ icon, children }: { icon: React.ReactNode; children: React.ReactNode }) {
+  return (
+    <div className="flex items-center gap-2 text-[13px]">
+      {icon}
+      <span className="text-foreground">{children}</span>
     </div>
   );
 }

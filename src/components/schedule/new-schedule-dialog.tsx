@@ -10,6 +10,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { createScheduleAction } from "@/app/actions/schedule";
 import { MEETING_DURATIONS, type MeetingDuration } from "@/lib/calendar/recommend";
+import { CONFERENCING, type ConferenceKey } from "@/lib/calendar/conferencing";
 import { cn } from "@/lib/utils";
 
 export interface SchedulableLead {
@@ -27,15 +28,6 @@ interface RepAvailability {
   slots: { start: string; end: string }[];
   provider: { kind: "google" | "local"; label: string };
 }
-
-const CONFERENCING = [
-  { key: "meet", label: "Google Meet", hint: "Created on the event by Google Calendar." },
-  { key: "zoom", label: "Zoom", hint: "Paste your Zoom room link." },
-  { key: "teams", label: "Microsoft Teams", hint: "Paste your Teams meeting link." },
-  { key: "none", label: "No video", hint: "Phone, or a location agreed separately." },
-] as const;
-
-type ConferenceKey = (typeof CONFERENCING)[number]["key"];
 
 /**
  * Book a meeting from the sales side.

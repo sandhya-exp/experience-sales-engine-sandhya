@@ -1,12 +1,15 @@
 import { AiBriefCard } from "@/components/workspace/ai-brief-card";
 import { AgentActionCard } from "@/components/workspace/agent-action-card";
+import { CallRecapCard } from "@/components/workspace/call-recap-card";
 import type { AiDealBrief } from "@/lib/types";
 import type { AgentActionRow, CustomerReplyMeta } from "@/lib/repo/agentActions";
+import type { CallRecapRow } from "@/lib/repo/callRecap";
 import type { QuoteSummary } from "@/components/workspace/ai-brief-card";
 
 /**
- * The AI tab: two cards. What the pipeline concluded (AI Summary), then the one
- * thing to do about it (AI Actions). The Act step is appended to the reasoning
+ * The AI tab: three cards. What the pipeline concluded (AI Summary), then the
+ * one thing to do about it (AI Actions), then the raw material a discovery
+ * call adds to both (Call Recap). The Act step is appended to the reasoning
  * chain inside the summary's fold, so a reviewer can follow it all the way
  * through — understand, retrieve, decide, check, recommend, act.
  */
@@ -19,6 +22,7 @@ export function AiBriefTab({
   providerLabel,
   lastReply,
   quote,
+  callRecap,
 }: {
   leadId: string;
   brief: AiDealBrief | null;
@@ -29,6 +33,8 @@ export function AiBriefTab({
   lastReply: { occurredAt: string; meta: CustomerReplyMeta } | null;
   /** The active quote, for the summary's status line. */
   quote?: QuoteSummary | null;
+  /** The most recently processed call transcript, if any. */
+  callRecap: CallRecapRow | null;
 }) {
   const actStep = action
     ? {
@@ -41,13 +47,16 @@ export function AiBriefTab({
     : null;
 
   return (
-    <AiBriefCard
-      brief={brief}
-      leadId={leadId}
-      canContract={canContract}
-      actStep={actStep}
-      quote={quote}
-      agentAction={<AgentActionCard leadId={leadId} action={action} autoMode={autoMode} providerLabel={providerLabel} lastReply={lastReply} />}
-    />
+    <div className="space-y-4">
+      <AiBriefCard
+        brief={brief}
+        leadId={leadId}
+        canContract={canContract}
+        actStep={actStep}
+        quote={quote}
+        agentAction={<AgentActionCard leadId={leadId} action={action} autoMode={autoMode} providerLabel={providerLabel} lastReply={lastReply} />}
+      />
+      <CallRecapCard leadId={leadId} latest={callRecap} />
+    </div>
   );
 }

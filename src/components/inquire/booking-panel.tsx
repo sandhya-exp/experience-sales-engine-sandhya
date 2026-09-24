@@ -1,9 +1,10 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { CalendarX2, ChevronLeft, ChevronRight, Clock, Globe, Loader2, Sparkles } from "lucide-react";
+import { CalendarX2, ChevronLeft, ChevronRight, Clock, Globe, Loader2, Sparkles, User, Video } from "lucide-react";
 import { bookCustomerSlotAction } from "@/app/actions/followups";
 import { MEETING_DURATIONS, type MeetingDuration, type MeetingRecommendation } from "@/lib/calendar/recommend";
+import { CONFERENCING, type ConferenceKey } from "@/lib/calendar/conferencing";
 import { cn } from "@/lib/utils";
 
 interface AvailabilityResponse {
@@ -11,6 +12,13 @@ interface AvailabilityResponse {
   timeZone: string;
   slotMinutes: number;
   slots: { start: string; end: string }[];
+  reps: { id: string; name: string }[];
+  selectedRep: { id: string; name: string } | null;
+}
+
+function initials(name: string) {
+  const parts = name.trim().split(/\s+/);
+  return ((parts[0]?.[0] ?? "") + (parts[1]?.[0] ?? "")).toUpperCase() || "?";
 }
 
 /**
@@ -18,25 +26,31 @@ interface AvailabilityResponse {
  *
  * A month calendar on one side and the open times for the chosen day on the
  * other — the shape people already know from every scheduling tool, so nobody
- * has to learn it. Two things are different, and both come from the agent
- * having already read the inquiry: the length is chosen for this conversation
- * rather than fixed at thirty minutes for everyone, and the panel beside it
- * says what the call will cover.
+ * has to learn it. Three things are different, and all three come from the
+ * agent having already read the inquiry, or from letting the customer decide:
+ * the length is chosen for this conversation rather than fixed at thirty
+ * minutes for everyone, who they meet and how they meet are the customer's
+ * own choice, and the panel beside it all says what the call will cover.
  *
- * Availability is always the server's answer. Changing the length re-asks for
- * it, because a sixty-minute call is only bookable where the team is free for a
- * whole hour, and the booking re-verifies the slot again before it is taken —
+ * Availability is always the server's answer. Changing the length or the
+ * chosen specialist re-asks for it, because a sixty-minute call — or a call
+ * with one particular person — is only bookable where that free/busy actually
+ * allows it, and the booking re-verifies the slot again before it is taken —
  * the browser's list is a display, never the authority.
  */
 export function BookingPanel({ leadId, recommendation, error }: { leadId: string; recommendation: MeetingRecommendation; error?: string | null }) {
   const [minutes, setMinutes] = useState<MeetingDuration>(recommendation.minutes);
+  const [repId, setRepId] = useState<string>("");
+  const [conference, setConference] = useState<ConferenceKey>("meet");
+  const [conferenceUrl, setConferenceUrl] = useState("");
   const [data, setData] = useState<AvailabilityResponse | null>(null);
-  // Which length the data on screen is for. Comparing it to the chosen length
-  // *derives* the loading state, rather than flipping a flag from inside the
-  // effect body — the same answer, without a synchronous setState in render.
-  const [loadedFor, setLoadedFor] = useState<MeetingDuration | null>(null);
+  // Which length+rep the data on screen is for. Comparing it to the current
+  // choice *derives* the loading state, rather than flipping a flag from
+  // inside the effect body — the same answer, without a synchronous setState in render.
+  const [loadedFor, setLoadedFor] = useState<string | null>(null);
   const [failed, setFailed] = useState(false);
-  const loading = loadedFor !== minutes && !failed;
+  const key = `${minutes}:${repId}`;
+  const loading = loadedFor !== key && !failed;
   const [submitting, setSubmitting] = useState<string | null>(null);
   const [selectedDay, setSelectedDay] = useState<string | null>(null);
   const [monthOffset, setMonthOffset] = useState(0);
@@ -51,23 +65,26 @@ export function BookingPanel({ leadId, recommendation, error }: { leadId: string
 
   useEffect(() => {
     let cancelled = false;
-    fetch(`/api/availability?minutes=${minutes}`, { cache: "no-store" })
+    const qs = new URLSearchParams({ minutes: String(minutes) });
+    if (repId) qs.set("rep", repId);
+    fetch(`/api/availability?${qs.toString()}`, { cache: "no-store" })
       .then((r) => (r.ok ? r.json() : Promise.reject(new Error(String(r.status)))))
       .then((d: AvailabilityResponse) => {
         if (cancelled) return;
         setData(d);
         setFailed(false);
-        setLoadedFor(minutes);
+        setLoadedFor(key);
       })
       .catch(() => {
         if (cancelled) return;
         setFailed(true);
-        setLoadedFor(minutes);
+        setLoadedFor(key);
       });
     return () => {
       cancelled = true;
     };
-  }, [minutes]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [minutes, repId]);
 
   /* Slots grouped by the customer's own calendar day. */
   const byDay = useMemo(() => {
@@ -77,9 +94,9 @@ export function BookingPanel({ leadId, recommendation, error }: { leadId: string
     const keyFmt = new Intl.DateTimeFormat("en-CA", { timeZone: tz, year: "numeric", month: "2-digit", day: "2-digit" });
     for (const s of data.slots) {
       const d = new Date(s.start);
-      const key = keyFmt.format(d);
-      if (!map.has(key)) map.set(key, []);
-      map.get(key)!.push({ start: s.start, time: timeFmt.format(d) });
+      const dayKey = keyFmt.format(d);
+      if (!map.has(dayKey)) map.set(dayKey, []);
+      map.get(dayKey)!.push({ start: s.start, time: timeFmt.format(d) });
     }
     return map;
   }, [data, tz]);
@@ -125,7 +142,7 @@ export function BookingPanel({ leadId, recommendation, error }: { leadId: string
         <p className="section-label">Experience.com</p>
         <h2 className="mt-1 text-[22px] font-bold leading-tight tracking-tight text-foreground">Discovery call</h2>
         <p className="mt-1.5 flex items-center gap-1.5 text-[13px] text-muted-foreground">
-          <Clock className="h-3.5 w-3.5" /> {minutes} minutes · video or phone
+          <Clock className="h-3.5 w-3.5" /> {minutes} minutes · {CONFERENCING.find((c) => c.key === conference)?.label ?? "video or phone"}
         </p>
 
         {recommendation.summary && (
@@ -179,6 +196,87 @@ export function BookingPanel({ leadId, recommendation, error }: { leadId: string
             {minutes === recommendation.minutes ? recommendation.reason : "You can change this — availability updates to match."}
           </p>
         </div>
+
+        {data && data.reps.length > 0 && (
+          <div className="mt-5">
+            <p className="section-label flex items-center gap-1.5">
+              <User className="h-3.5 w-3.5" /> Who you&rsquo;d like to meet
+            </p>
+            <div className="mt-2 flex flex-wrap gap-1.5">
+              <button
+                type="button"
+                aria-pressed={repId === ""}
+                onClick={() => {
+                  setRepId("");
+                  setSelectedDay(null);
+                }}
+                className={cn(
+                  "rounded-md border px-2.5 py-1.5 text-[13px] font-medium transition-colors",
+                  repId === "" ? "border-navy bg-navy text-white" : "border-border bg-card text-foreground hover:border-navy/40"
+                )}
+              >
+                Any available specialist
+              </button>
+              {data.reps.map((r) => (
+                <button
+                  key={r.id}
+                  type="button"
+                  aria-pressed={repId === r.id}
+                  onClick={() => {
+                    setRepId(r.id);
+                    setSelectedDay(null);
+                  }}
+                  className={cn(
+                    "flex items-center gap-1.5 rounded-md border px-2.5 py-1.5 text-[13px] font-medium transition-colors",
+                    repId === r.id ? "border-navy bg-navy text-white" : "border-border bg-card text-foreground hover:border-navy/40"
+                  )}
+                >
+                  <span
+                    className={cn(
+                      "flex h-[18px] w-[18px] items-center justify-center rounded-full text-[9px] font-semibold",
+                      repId === r.id ? "bg-white/20 text-white" : "bg-primary/15 text-primary"
+                    )}
+                  >
+                    {initials(r.name)}
+                  </span>
+                  {r.name}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
+        <div className="mt-5">
+          <p className="section-label flex items-center gap-1.5">
+            <Video className="h-3.5 w-3.5" /> How you&rsquo;ll meet
+          </p>
+          <div className="mt-2 flex flex-wrap gap-1.5">
+            {CONFERENCING.map((c) => (
+              <button
+                key={c.key}
+                type="button"
+                aria-pressed={conference === c.key}
+                title={c.hint}
+                onClick={() => setConference(c.key)}
+                className={cn(
+                  "rounded-md border px-2.5 py-1.5 text-[13px] font-medium transition-colors",
+                  conference === c.key ? "border-navy bg-navy text-white" : "border-border bg-card text-foreground hover:border-navy/40"
+                )}
+              >
+                {c.label}
+              </button>
+            ))}
+          </div>
+          {(conference === "zoom" || conference === "teams") && (
+            <input
+              type="url"
+              value={conferenceUrl}
+              onChange={(e) => setConferenceUrl(e.target.value)}
+              placeholder={conference === "zoom" ? "https://zoom.us/j/…" : "https://teams.microsoft.com/l/meetup-join/…"}
+              className="mt-2 h-9 w-full rounded-md border border-input bg-card px-2.5 text-[13px] text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            />
+          )}
+        </div>
       </aside>
 
       {/* ---- Right: pick a day, then a time --------------------------------- */}
@@ -189,6 +287,11 @@ export function BookingPanel({ leadId, recommendation, error }: { leadId: string
         {error === "calendar" && (
           <p className="mt-3 rounded-md bg-destructive/10 px-3 py-2 text-[13px] text-destructive">
             We couldn&rsquo;t confirm that time with our calendar. Please try another slot, or we&rsquo;ll reach out to schedule.
+          </p>
+        )}
+        {error === "conference" && (
+          <p className="mt-3 rounded-md bg-destructive/10 px-3 py-2 text-[13px] text-destructive">
+            Add your Zoom or Teams link before booking, or choose Google Meet or no video instead.
           </p>
         )}
 
@@ -281,6 +384,9 @@ export function BookingPanel({ leadId, recommendation, error }: { leadId: string
                       <input type="hidden" name="slot" value={s.start} />
                       <input type="hidden" name="timezone" value={tz} />
                       <input type="hidden" name="minutes" value={minutes} />
+                      <input type="hidden" name="repId" value={repId} />
+                      <input type="hidden" name="conference" value={conference} />
+                      <input type="hidden" name="conferenceUrl" value={conferenceUrl} />
                       <button
                         type="submit"
                         disabled={submitting !== null}

@@ -13,7 +13,8 @@
     "eval:ai": "tsx evals/ai-intelligence/run.ts",
     "gcal:check": "node scripts/gcal-setup.mjs",
     "gcal:setup": "node scripts/gcal-setup.mjs --create",
-    "eval:agent": "tsx evals/agent/run.ts"
+    "eval:agent": "tsx evals/agent/run.ts",
+    "eval:call-recap": "tsx evals/call-recap/run.ts"
   },
   "dependencies": {
     "@radix-ui/react-avatar": "^1.2.6",

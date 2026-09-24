@@ -41,8 +41,8 @@ export function PipelineFilters({
     <>
       <div className="relative">
         <Users className="pointer-events-none absolute left-2 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
-        <select aria-label="Filter by owner" className={select} value={sp.get("owner") ?? ""} onChange={(e) => go("owner", e.target.value)}>
-          <option value="">Everyone</option>
+        <select aria-label="Filter by sales team member" className={select} value={sp.get("owner") ?? ""} onChange={(e) => go("owner", e.target.value)}>
+          <option value="">All sales team members</option>
           <option value="me">My leads</option>
           {team
             .filter((m) => m.id !== currentUserId)

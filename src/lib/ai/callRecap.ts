@@ -167,7 +167,15 @@ function deterministicExtraction(transcript: string): { facts: ExtractedFact[]; 
   const facts: ExtractedFact[] = [];
 
   for (const s of sentences) {
-    const m = s.match(/\b(?:we (?:use|are on|'re on|run|have)|our (?:\w+ )?(?:system|platform|crm|mls) is)\s+([A-Z][\w.&-]*(?:\s+[A-Z][\w.&-]*){0,3})/i);
+    // Case-sensitive on purpose (like reply.ts): the captured name must start
+    // with an actual capital letter, or a generic word like "about" ends up
+    // masquerading as a system name once matching goes case-insensitive.
+    // The trigger phrase itself is matched case-insensitively (a transcript
+    // line starts "We're on Bright MLS...", capitalized, unlike a reply's
+    // mid-sentence "we use Bright MLS"), and "have" is dropped from the
+    // trigger words entirely -- too generic ("we have about 85 agents") to
+    // reliably introduce a system name the way "use/are on/run" do.
+    const m = s.match(/\b(?:[Ww]e(?:'re| are)\s+on|[Ww]e\s+(?:use|run)|[Oo]ur\s+(?:\w+\s+)?(?:system|platform|CRM|MLS)\s+is)\s+([A-Z][\w.&-]*(?:\s+[A-Z][\w.&-]*){0,3})/);
     if (m) systems.push({ name: m[1].replace(/[.,;]$/, "").trim(), quote: s });
     const users = s.match(/\b(\d{1,6})\s+(?:users?|people|employees|agents?|seats?)\b/i);
     if (users && !/\bper\s+(?:branch|office|location|site|store|team)\b/i.test(s) && !facts.some((f) => f.field === "number_of_users")) {

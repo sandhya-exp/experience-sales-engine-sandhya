@@ -31,9 +31,20 @@ async function actorName() {
 export async function logActivityAction(leadId: string, formData: FormData) {
   const type = String(formData.get("type") ?? "note") as ActivityType;
   const body = String(formData.get("body") ?? "");
+  // "kind" carries the same subtype tagging every other activity already uses
+  // (call_recap, booking_confirmation_email, …) — a no-show is still a call,
+  // just one where nothing was said, so it needs no new activity type.
+  const kind = String(formData.get("kind") ?? "");
   const name = await actorName();
   const user = await getCurrentUser();
-  await recordActivity({ leadId, type, body, actorUserId: user?.id, actorName: name });
+  await recordActivity({
+    leadId,
+    type,
+    body: body || (kind === "no_show" ? "Customer did not show up for the scheduled call." : null),
+    actorUserId: user?.id,
+    actorName: name,
+    metadata: kind === "no_show" ? { kind: "no_show" } : undefined,
+  });
   revalidatePath(`/leads/${leadId}`);
 }
 

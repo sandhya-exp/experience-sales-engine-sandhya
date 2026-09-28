@@ -1,9 +1,11 @@
 import { AiBriefCard } from "@/components/workspace/ai-brief-card";
 import { AgentActionCard } from "@/components/workspace/agent-action-card";
 import { CallRecapCard } from "@/components/workspace/call-recap-card";
+import { InboundReplyCard } from "@/components/workspace/inbound-reply-card";
 import type { AiDealBrief } from "@/lib/types";
 import type { AgentActionRow, CustomerReplyMeta } from "@/lib/repo/agentActions";
 import type { CallRecapRow } from "@/lib/repo/callRecap";
+import type { InboundReplyRow } from "@/lib/repo/inboundReply";
 import type { QuoteSummary } from "@/components/workspace/ai-brief-card";
 
 /**
@@ -23,6 +25,7 @@ export function AiBriefTab({
   lastReply,
   quote,
   callRecap,
+  inboundReply,
 }: {
   leadId: string;
   brief: AiDealBrief | null;
@@ -35,6 +38,8 @@ export function AiBriefTab({
   quote?: QuoteSummary | null;
   /** The most recently processed call transcript, if any. */
   callRecap: CallRecapRow | null;
+  /** The most recently captured inbound email reply, if any. */
+  inboundReply: InboundReplyRow | null;
 }) {
   const actStep = action
     ? {
@@ -57,6 +62,7 @@ export function AiBriefTab({
         agentAction={<AgentActionCard leadId={leadId} action={action} autoMode={autoMode} providerLabel={providerLabel} lastReply={lastReply} />}
       />
       <CallRecapCard leadId={leadId} latest={callRecap} />
+      <InboundReplyCard leadId={leadId} latest={inboundReply} />
     </div>
   );
 }

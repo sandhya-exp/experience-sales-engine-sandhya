@@ -16,6 +16,31 @@ export async function findContactByEmail(companyId: string, email: string): Prom
   return queryOne<Contact>("select * from contacts where company_id = $1 and email = $2", [companyId, email]);
 }
 
+/**
+ * Attribute an inbound message to the right opportunity from the sender's
+ * email address alone — no companyId to scope by, unlike `findContactByEmail`.
+ * A person can be a contact on more than one company's account over time, so
+ * this picks the contact's most relevant lead: an open one (not won or lost)
+ * first, falling back to the most recently updated lead otherwise. Used by
+ * the inbound email webhook, which only ever has the "From" address to go on.
+ */
+export async function findLeadByContactEmail(email: string): Promise<{ contact: Contact; leadId: string } | null> {
+  const trimmed = email.trim();
+  if (!trimmed) return null;
+  const row = await queryOne<{ contact_id: string; lead_id: string }>(
+    `select c.id as contact_id, l.id as lead_id
+       from contacts c
+       join leads l on l.company_id = c.company_id
+      where lower(c.email) = lower($1)
+      order by (l.status not in ('won', 'lost')) desc, l.updated_at desc
+      limit 1`,
+    [trimmed]
+  );
+  if (!row) return null;
+  const contact = await queryOne<Contact>("select * from contacts where id = $1", [row.contact_id]);
+  return contact ? { contact, leadId: row.lead_id } : null;
+}
+
 // Used by the customer-facing inquiry flow. Company de-dup means a second
 // inquiry from the same domain can arrive with a contact email that either
 // (a) already exists for that company — just reuse it, or (b) is a new

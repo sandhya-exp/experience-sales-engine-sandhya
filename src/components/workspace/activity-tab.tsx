@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { formatActivityTime } from "@/lib/format";
-import { Bot, Building2, CalendarClock, Flag, Mail, MessageSquare, Phone, StickyNote, UserRound, Cog } from "lucide-react";
+import { Bot, Building2, CalendarClock, Flag, Mail, MessageSquare, Phone, PhoneMissed, StickyNote, UserRound, Cog } from "lucide-react";
 import { ScheduleFollowUpDialog } from "@/components/workspace/schedule-follow-up-dialog";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { LogActivityDialog } from "@/components/workspace/log-activity-dialog";
@@ -69,6 +69,7 @@ function EventIcon({ event: e, className }: { event: TimelineEvent; className?: 
   const a = e.activity;
   if (e.milestone && e.label !== "Inquiry received" && !/booked|completed/.test(e.label)) return <Flag className={className} />;
   if (/booked|completed/.test(e.label)) return <CalendarClock className={className} />;
+  if (a?.metadata?.kind === "no_show") return <PhoneMissed className={className} />;
   if (e.actor === "ai") return <Bot className={className} />;
   if (a?.type === "call") return <Phone className={className} />;
   if (a?.type === "email" || /message/i.test(e.label)) return <Mail className={className} />;

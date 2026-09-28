@@ -106,10 +106,9 @@ export function AgentActionCard({
           </p>
         )}
 
-        {/* Reason → recommendation → artifact → approval, as one workflow: the
-            goal, why and evidence are the reasoning; the email (when there is
-            one) is the artifact that reasoning produced, previewed compactly
-            right here rather than in a section a reader has to scroll to. */}
+        {/* Reasoning first, on its own: goal, why, and evidence. The email
+            (when there is one) is a separate card below — the artifact that
+            reasoning produced, not one more thing crammed into this box. */}
         <div className={cn("rounded-xl border p-4", executed ? "border-success/30 bg-success/5" : meta.risk === "red" ? "border-destructive/30 bg-destructive/5" : "border-navy/20 bg-[#eef2fb]")}>
           <p className="text-[17px] font-semibold leading-snug text-foreground">{meta.goal}</p>
 
@@ -118,21 +117,21 @@ export function AgentActionCard({
             <Field label="Automation">
               <span className={cn(meta.risk === "green" ? "text-success" : meta.risk === "red" ? "text-destructive" : "text-foreground")}>{RISK_TEXT[meta.risk]}</span>
             </Field>
-            {meta.evidence.length > 0 && (
-              <div className="sm:col-span-2">
-                <dt className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Evidence</dt>
-                <dd className="mt-1 flex flex-wrap gap-1.5">
-                  {meta.evidence.map((e, i) => (
-                    <span key={i} className="rounded-md border border-border bg-card px-2 py-1 text-[12px] text-foreground">
-                      {e.claim} <span className="text-muted-foreground">· {sourceLabel(e.source)}</span>
-                    </span>
-                  ))}
-                </dd>
-              </div>
-            )}
           </dl>
 
-          {meta.draft_message && <ProposedEmailBlock leadId={leadId} action={action} providerLabel={providerLabel} />}
+          {meta.evidence.length > 0 && (
+            <div className="mt-3">
+              <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Evidence</p>
+              <ul className="mt-1.5 space-y-1">
+                {meta.evidence.map((e, i) => (
+                  <li key={i} className="flex items-start justify-between gap-3 rounded-md border border-border/70 bg-card/80 px-2.5 py-1.5 text-[12.5px] leading-snug">
+                    <span className="text-foreground">{e.claim}</span>
+                    <span className="shrink-0 whitespace-nowrap text-[11px] text-muted-foreground">{sourceLabel(e.source)}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
 
           {!meta.draft_message && !executed && meta.state !== "declined" && (
             <div className="mt-3 flex flex-wrap gap-2">
@@ -144,24 +143,29 @@ export function AgentActionCard({
               </Button>
             </div>
           )}
-
-          {executed && (
-            <div className="mt-3 rounded-lg border border-border bg-card px-3 py-2.5">
-              <p className="flex items-center gap-2 text-[13px] font-medium text-foreground">
-                <CheckCircle2 className="h-4 w-4 text-success" />
-                {meta.trace.result ?? "Done."}
-              </p>
-              {meta.executed_at && <p className="mt-0.5 pl-6 text-[12px] text-muted-foreground">{new Date(meta.executed_at).toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}{meta.auto ? " · executed automatically" : ""}</p>}
-              {waiting && (
-                <p className="mt-1.5 flex items-center gap-1.5 pl-6 text-[12px] text-muted-foreground">
-                  <Clock className="h-3.5 w-3.5" /> Waiting for the customer to reply.
-                </p>
-              )}
-            </div>
-          )}
-
-          {waiting && <ReplyBox leadId={leadId} inReplyTo={action.activityId} />}
         </div>
+
+        {/* The proposed email, as its own card — separated from the reasoning
+            above rather than nested inside it, so each reads as a distinct
+            block: why this, then here's the actual message. */}
+        {meta.draft_message && <ProposedEmailBlock leadId={leadId} action={action} providerLabel={providerLabel} />}
+
+        {executed && (
+          <div className="rounded-lg border border-success/30 bg-success/5 px-3 py-2.5">
+            <p className="flex items-center gap-2 text-[13px] font-medium text-foreground">
+              <CheckCircle2 className="h-4 w-4 text-success" />
+              {meta.trace.result ?? "Done."}
+            </p>
+            {meta.executed_at && <p className="mt-0.5 pl-6 text-[12px] text-muted-foreground">{new Date(meta.executed_at).toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}{meta.auto ? " · executed automatically" : ""}</p>}
+            {waiting && (
+              <p className="mt-1.5 flex items-center gap-1.5 pl-6 text-[12px] text-muted-foreground">
+                <Clock className="h-3.5 w-3.5" /> Waiting for the customer to reply.
+              </p>
+            )}
+          </div>
+        )}
+
+        {waiting && <ReplyBox leadId={leadId} inReplyTo={action.activityId} />}
 
         {lastReply && <CustomerResponsePanel reply={lastReply} />}
 

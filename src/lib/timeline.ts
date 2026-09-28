@@ -101,6 +101,36 @@ export function buildTimeline(activities: Activity[], briefs: AiDealBrief[], lea
       continue;
     }
 
+    if (kind === "inbound_reply") {
+      const text = String(m.text ?? a.body ?? "");
+      const factCount = ((m.facts as unknown[] | undefined)?.length ?? 0) + ((m.systems as unknown[] | undefined)?.length ?? 0);
+      const confirmedCount = (m.confirmed_indices as unknown[] | undefined)?.length ?? 0;
+      events.push({
+        id: a.id,
+        at: iso(a.occurred_at),
+        label: "Customer replied by email",
+        detail: `“${text.length > 120 ? `${text.slice(0, 119)}…` : text}”`,
+        actor: "customer",
+        actorName: a.actor_name ?? "Customer",
+        milestone: false,
+        href: `/leads/${leadId}?tab=brief`,
+        activity: a,
+      });
+      if (factCount > 0) {
+        events.push({
+          id: `${a.id}:extracted`,
+          at: iso(a.occurred_at),
+          label: confirmedCount > 0 ? "AI extracted facts — some confirmed" : "AI extracted facts — awaiting confirmation",
+          detail: `${factCount} item${factCount === 1 ? "" : "s"} found · review in AI tab`,
+          actor: "ai",
+          actorName: "AI agent",
+          milestone: false,
+          href: `/leads/${leadId}?tab=brief`,
+        });
+      }
+      continue;
+    }
+
     if (kind === "quote") {
       events.push({ id: a.id, at: iso(a.occurred_at), label: `Quote v${m.version} created`, detail: `${formatMoney(Number(m.total ?? 0))} · valid until ${m.valid_until}${(m.review as { needs_approval?: boolean } | undefined)?.needs_approval ? " · needs approval" : ""}`, actor: "team", actorName: a.actor_name ?? "Team", milestone: true, href: `/leads/${leadId}?tab=quotes`, activity: a });
       continue;
@@ -142,6 +172,10 @@ export function buildTimeline(activities: Activity[], briefs: AiDealBrief[], lea
     }
     if (kind === "assignment") {
       events.push({ id: a.id, at: iso(a.occurred_at), label: "Owner assigned", detail: a.body, actor: a.actor_name === "System" ? "system" : "team", actorName: a.actor_name ?? "System", milestone: false, activity: a });
+      continue;
+    }
+    if (kind === "no_show") {
+      events.push({ id: a.id, at: iso(a.occurred_at), label: "Customer no-showed", detail: a.body, actor: a.actor_name === "System" ? "system" : "team", actorName: a.actor_name ?? "Team", milestone: true, activity: a });
       continue;
     }
 

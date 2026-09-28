@@ -69,10 +69,22 @@ export class GoogleCalendarProvider implements CalendarProvider {
         : {}),
     };
     // conferenceDataVersion=1 is required for Google to honour createRequest.
-    const path = `/calendar/v3/calendars/${encodeURIComponent(input.calendarId)}/events?sendUpdates=all${wantsMeet ? "&conferenceDataVersion=1" : ""}`;
+    let path = `/calendar/v3/calendars/${encodeURIComponent(input.calendarId)}/events?sendUpdates=all${wantsMeet ? "&conferenceDataVersion=1" : ""}`;
     let res = await this.call(path, { method: "POST", body: JSON.stringify(body) }, { allowError: true });
     let attendeesInvited = true;
     let note: string | undefined;
+    if (res.status === 400 && wantsMeet) {
+      // Without domain-wide delegation Google often refuses to mint a Meet link
+      // for a service account ("Invalid conference type value"). The booking is
+      // what matters: create the event without the Meet request and say so,
+      // rather than telling the customer their call didn't book.
+      const err = await res.text();
+      if (!/conference/i.test(err)) throw new Error(`Google Calendar events.insert 400: ${err.slice(0, 200)}`);
+      delete (body as { conferenceData?: unknown }).conferenceData;
+      path = path.replace("&conferenceDataVersion=1", "");
+      note = "Google would not create a Meet link from the service account — the rep adds the video link to the invite.";
+      res = await this.call(path, { method: "POST", body: JSON.stringify(body) }, { allowError: true });
+    }
     if (res.status === 403) {
       // Without domain-wide delegation Google refuses attendee lists from service accounts
       // ("forbiddenForServiceAccounts"). Create the event without attendees rather than fail
@@ -80,12 +92,22 @@ export class GoogleCalendarProvider implements CalendarProvider {
       const err = await res.text();
       if (/forbiddenForServiceAccounts|attendees/i.test(err)) {
         attendeesInvited = false;
-        note = "Google would not send invitations from the service account (no domain-wide delegation) — the event is on the team calendar; the rep sends the invite.";
-        res = await this.call(path.replace("?sendUpdates=all", "?"), { method: "POST", body: JSON.stringify({ ...body, attendees: undefined }) });
+        note = [note, "Google would not send invitations from the service account (no domain-wide delegation) — the event is on the team calendar; the rep sends the invite."].filter(Boolean).join(" ");
+        res = await this.call(path.replace("?sendUpdates=all", "?"), { method: "POST", body: JSON.stringify({ ...body, attendees: undefined }) }, { allowError: true });
+        if (res.status === 400 && "conferenceData" in body) {
+          const err = await res.text();
+          if (!/conference/i.test(err)) throw new Error(`Google Calendar events.insert 400: ${err.slice(0, 200)}`);
+          delete (body as { conferenceData?: unknown }).conferenceData;
+          note = `${note} Google would not create a Meet link from the service account — the rep adds the video link.`;
+          res = await this.call(path.replace("?sendUpdates=all", "?").replace("&conferenceDataVersion=1", ""), { method: "POST", body: JSON.stringify({ ...body, attendees: undefined }) });
+        } else if (!res.ok) {
+          throw new Error(`Google Calendar events.insert ${res.status}: ${(await res.text()).slice(0, 200)}`);
+        }
       } else {
         throw new Error(`Google Calendar events.insert 403: ${err.slice(0, 200)}`);
       }
     }
+    if (!res.ok) throw new Error(`Google Calendar events.insert ${res.status}: ${(await res.text()).slice(0, 200)}`);
     const data = (await res.json()) as { id: string; htmlLink?: string; hangoutLink?: string; conferenceData?: { entryPoints?: { uri?: string }[] } };
     const meetUrl = data.hangoutLink ?? data.conferenceData?.entryPoints?.find((e) => e.uri?.startsWith("http"))?.uri ?? null;
     return { id: data.id, htmlLink: data.htmlLink ?? null, attendeesInvited, note, conferenceUrl: pastedUrl ?? meetUrl };
@@ -100,7 +122,7 @@ export class GoogleCalendarProvider implements CalendarProvider {
       headers: { "content-type": "application/json", authorization: `Bearer ${token}`, ...(init.headers ?? {}) },
       signal: AbortSignal.timeout(15_000),
     });
-    if (!res.ok && !(opts.allowError && res.status === 403)) {
+    if (!res.ok && !(opts.allowError && (res.status === 403 || res.status === 400))) {
       throw new Error(`Google Calendar ${path.split("?")[0]} → ${res.status}: ${(await res.text()).slice(0, 200)}`);
     }
     return res;

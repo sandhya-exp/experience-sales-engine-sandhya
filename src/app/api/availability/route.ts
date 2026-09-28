@@ -26,9 +26,10 @@ export async function GET(request: Request) {
     const repId = params.get("rep");
 
     const team = await listTeam();
-    // Only the people who actually take calls — routing already hands leads
-    // to the first sales-role match, so the picker offers the same set.
-    const reps = team.filter((t) => t.role !== "admin");
+    // Everyone on the team takes discovery calls, admins included — the admin
+    // is a working salesperson too, and a customer who picks them should land
+    // on their calendar like anyone else.
+    const reps = team;
     const selected = repId ? reps.find((r) => r.id === repId) ?? null : null;
 
     const a = await computeAvailability({

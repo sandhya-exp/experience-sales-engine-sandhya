@@ -15,6 +15,8 @@ import { hasContractAccess, hasQuoteApproval } from "@/lib/authz";
 import { hasIntelligence } from "@/lib/ai/briefGuards";
 import { currentAgentActionFor, latestCustomerReply } from "@/lib/repo/agentActions";
 import { latestCallRecap } from "@/lib/repo/callRecap";
+import { pendingApprovals } from "@/lib/repo/approvals";
+import { ApprovalsCard } from "@/components/workspace/approvals-card";
 import { latestInboundReply } from "@/lib/repo/inboundReply";
 import { listBriefHistory } from "@/lib/repo/aiBriefs";
 import { listQuotesForLead, activeQuote, formatMoney } from "@/lib/repo/quotes";
@@ -33,7 +35,7 @@ export default async function LeadWorkspacePage({ params, searchParams }: PagePr
   if (!data) notFound();
 
   const { lead, company, contacts, activities, brief, ownerName } = data;
-  const [followUp, team, canContract, canApprove, agentAction, autoMode, lastReply, callRecap, inboundReply, briefHistory, quotes] = await Promise.all([
+  const [followUp, team, canContract, canApprove, agentAction, autoMode, lastReply, callRecap, inboundReply, briefHistory, quotes, approvals] = await Promise.all([
     nextFollowUpFor(lead.id),
     listTeam(),
     hasContractAccess(),
@@ -45,6 +47,7 @@ export default async function LeadWorkspacePage({ params, searchParams }: PagePr
     latestInboundReply(lead.id),
     listBriefHistory(lead.id),
     listQuotesForLead(lead.id),
+    pendingApprovals(lead.id),
   ]);
   const quote = activeQuote(quotes);
   const provider = emailProvider();
@@ -87,6 +90,8 @@ export default async function LeadWorkspacePage({ params, searchParams }: PagePr
           qualification={<QualificationTab lead={lead} contacts={contacts} focus={focus} />}
           quotes={<QuotesTab leadId={lead.id} lead={lead} company={company} quotes={quotes} isAdmin={canApprove} intelligence={hasIntelligence(brief) ? brief.intelligence : null} />}
           brief={
+            <div className="space-y-4">
+            <ApprovalsCard requests={approvals} />
             <AiBriefTab
               leadId={lead.id}
               brief={brief}
@@ -97,6 +102,7 @@ export default async function LeadWorkspacePage({ params, searchParams }: PagePr
               lastReply={lastReply}
               quote={quote ? { version: quote.meta.version, status: quote.meta.status, total: formatMoney(quote.meta.total) } : null}
             />
+            </div>
           }
         />
       </div>

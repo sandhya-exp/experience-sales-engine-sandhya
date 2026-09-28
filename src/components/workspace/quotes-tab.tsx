@@ -1,6 +1,7 @@
 import { AlertTriangle, ArrowRight, CheckCircle2, Circle, FileText, GitCompare, MessageSquare, ShieldCheck } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { QuotePrepCard } from "@/components/workspace/quote-prep-card";
 import { QuoteFormDialog } from "@/components/workspace/quote-form-dialog";
 import { QuoteActions } from "@/components/workspace/quote-actions";
 import { activeQuote, diffQuotes, effectiveStatus, formatMoney, isEmptyDiff, previousVersion, QUOTE_FLOW, QUOTE_STATUS_LABEL, type QuoteRow, type QuoteStatus } from "@/lib/repo/quotes";
@@ -40,6 +41,7 @@ export function QuotesTab({
 
   return (
     <div className="space-y-4">
+      <QuotePrepCard leadId={leadId} />
       <Card>
         <CardHeader className="flex-row flex-wrap items-center justify-between gap-3 space-y-0">
           <CardTitle className="flex items-center gap-2">

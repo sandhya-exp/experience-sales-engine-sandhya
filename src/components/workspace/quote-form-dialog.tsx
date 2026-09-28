@@ -15,6 +15,8 @@ import { computeTotals, endOfTerm, lineNet, netUnitPrice, type QuoteLineItem } f
 import type { QuoteMeta } from "@/lib/repo/quotes";
 import { lineApproval, uncoveredRequirements, type DiscountRules } from "@/lib/quotes/rules";
 import { cn } from "@/lib/utils";
+import { findProduct, getProducts, lineDescription, PRICE_LIST, unitLabel } from "@/lib/catalog/catalog";
+import { validateDiscount } from "@/lib/catalog/pricing";
 import type { Lead } from "@/lib/types";
 import type { OpportunityIntelligence } from "@/lib/ai/intelligence";
 
@@ -94,7 +96,7 @@ export function QuoteFormDialog({
   // The strongest authority this quote calls for: whichever is higher, the
   // effective discount overall or the deepest single line. A rep should not have
   // to work out which of the two is the one holding the quote up.
-  const approval = [lineApproval(totals.discount_pct, rules), ...items.map((it) => lineApproval(it.discount_pct, rules))].reduce((worst, a) =>
+  const approval = [lineApproval(totals.discount_pct, rules), ...items.map((it) => lineLevel(it, rules))].reduce((worst, a) =>
     RANK[a] > RANK[worst] ? a : worst
   , "ok" as ApprovalLevel);
 
@@ -200,7 +202,8 @@ export function QuoteFormDialog({
                 </thead>
                 <tbody className="divide-y divide-border">
                   {items.map((it, i) => {
-                    const a = lineApproval(it.discount_pct, rules);
+                    const a = lineLevel(it, rules);
+                    const product = findProduct(it.description);
                     return (
                       <tr key={i} className={cn(a !== "ok" && "bg-amber-50/50 dark:bg-amber-950/10")}>
                         <td className="px-2 py-1 text-[12px] tabular-nums text-muted-foreground">{i + 1}</td>
@@ -208,11 +211,25 @@ export function QuoteFormDialog({
                           <Input
                             name={`item_${i}_description`}
                             value={it.description}
-                            onChange={(e) => set(i, { description: e.target.value })}
-                            placeholder="e.g. Reputation Management"
+                            onChange={(e) => {
+                              const description = e.target.value;
+                              // Picking a catalog product fills its list price — the price
+                              // comes from the price list, never from memory or the model.
+                              const match = findProduct(description);
+                              const exact = match && (description === lineDescription(match) || description.trim().toLowerCase() === match.name.toLowerCase());
+                              set(i, exact && match ? { description: lineDescription(match), unit_price: match.list_price, quantity: match.unit === "platform" ? 1 : it.quantity } : { description });
+                            }}
+                            list="catalog-products"
+                            placeholder="Pick a product, e.g. SRP850"
                             className="h-8"
                             required
                           />
+                          {product && (
+                            <p className="mt-0.5 px-1 text-[11px] text-muted-foreground">
+                              List {money(product.list_price)} {unitLabel(product.unit)}
+                              {it.unit_price !== product.list_price && <span className="text-amber-700"> · price differs from list</span>}
+                            </p>
+                          )}
                         </td>
                         <td className="px-1.5 py-1">
                           <Input name={`item_${i}_quantity`} type="number" min={0} step={1} value={it.quantity} onChange={(e) => set(i, { quantity: Number(e.target.value) })} className="h-8 text-right" />
@@ -256,6 +273,12 @@ export function QuoteFormDialog({
                   })}
                 </tbody>
               </table>
+              <datalist id="catalog-products">
+                {getProducts().map((p) => (
+                  <option key={p.code} value={lineDescription(p)}>{`${money(p.list_price)} ${unitLabel(p.unit)}`}</option>
+                ))}
+              </datalist>
+              <p className="border-t border-border px-3 py-1.5 text-[11px] text-muted-foreground">Prices from the {PRICE_LIST.label.toLowerCase()} (v{PRICE_LIST.version}).</p>
             </div>
 
             <div className="flex flex-wrap items-start justify-between gap-4 border-t border-border bg-muted/30 px-2 py-2">
@@ -416,12 +439,26 @@ function prefilledLines(lead: Lead, intelligence: OpportunityIntelligence | null
   const users = lead.number_of_users && lead.number_of_users > 0 ? lead.number_of_users : null;
   const asked = uncoveredRequirements({ items: [], lead, intelligence });
   if (asked.length === 0) return [blankLine()];
-  return asked.map((name) => ({
-    description: name,
-    quantity: users ?? 1,
-    unit_price: 0,
-    discount_pct: 0,
-  }));
+  const seen = new Set<string>();
+  const lines: QuoteLineItem[] = [];
+  for (const name of asked) {
+    // A requested area that maps to a catalog product is priced from the price
+    // list; anything the catalog doesn't carry stays for the rep to price.
+    const p = findProduct(name);
+    if (p) {
+      if (seen.has(p.code)) continue;
+      seen.add(p.code);
+      lines.push({ description: lineDescription(p), quantity: p.unit === "platform" ? 1 : users ?? 1, unit_price: p.list_price, discount_pct: 0 });
+    } else {
+      lines.push({ description: name, quantity: users ?? 1, unit_price: 0, discount_pct: 0 });
+    }
+  }
+  return lines;
+}
+
+/** A line's own approval level: the global thresholds, plus the product's ceiling on the price list. */
+function lineLevel(it: QuoteLineItem, rules: DiscountRules): ApprovalLevel {
+  return validateDiscount(findProduct(it.description)?.code ?? null, it.discount_pct, rules).level;
 }
 
 function blankLine(): QuoteLineItem {

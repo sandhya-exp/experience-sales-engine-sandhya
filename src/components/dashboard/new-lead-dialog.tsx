@@ -9,6 +9,7 @@ import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { INDUSTRIES } from "@/lib/industries";
+import { INTEREST_OPTIONS } from "@/lib/inquiry-schema";
 
 const initialState: ManualLeadFormState = { errors: {} };
 
@@ -61,7 +62,18 @@ export function NewLeadDialog({ children }: { children: React.ReactNode }) {
             </F>
           </div>
           <F label="Interested in" error={state.errors.interest}>
-            <Input name="interest" />
+            <Select name="interest" required>
+              <SelectTrigger>
+                <SelectValue placeholder="Choose an area" />
+              </SelectTrigger>
+              <SelectContent>
+                {INTEREST_OPTIONS.map((opt) => (
+                  <SelectItem key={opt} value={opt}>
+                    {opt}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </F>
           <F label="Requirements" error={state.errors.requirements}>
             <Textarea name="requirements" rows={2} required />

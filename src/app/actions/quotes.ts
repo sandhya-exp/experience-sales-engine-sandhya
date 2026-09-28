@@ -365,7 +365,7 @@ export async function draftNarrativeAction(leadId: string, formData: FormData): 
   const data = await getWorkspaceData(leadId);
   if (!data) return { ok: false, detail: "Opportunity not found." };
   const items = parseItems(formData);
-  if (!items.length) return { ok: false, detail: "Add a line item first — the note describes what is on the quote." };
+  if (!items.length) return { ok: false, detail: "Name the product on at least one line first — the note describes what is on the quote, and an unnamed line is skipped." };
 
   const brief = await getLatestBrief(leadId);
   const intel = hasIntelligence(brief) ? brief.intelligence : null;

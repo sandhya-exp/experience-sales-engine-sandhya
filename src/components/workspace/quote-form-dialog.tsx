@@ -189,8 +189,8 @@ export function QuoteFormDialog({
                   <tr>
                     <th className="w-8 px-2 py-1.5 text-left font-semibold">#</th>
                     <th className="px-2 py-1.5 text-left font-semibold">Product / service</th>
-                    <th className="w-20 px-2 py-1.5 text-right font-semibold">Qty</th>
-                    <th className="w-28 px-2 py-1.5 text-right font-semibold">List unit price</th>
+                    <th className="w-20 px-2 py-1.5 text-right font-semibold" title="Seats on the subscription">Users</th>
+                    <th className="w-28 px-2 py-1.5 text-right font-semibold" title="List price per user for the term">Price / user</th>
                     <th className="w-24 px-2 py-1.5 text-right font-semibold">Disc %</th>
                     <th className="w-24 px-2 py-1.5 text-right font-semibold">Net unit</th>
                     <th className="w-24 px-2 py-1.5 text-center font-semibold">Approval</th>
@@ -209,7 +209,7 @@ export function QuoteFormDialog({
                             name={`item_${i}_description`}
                             value={it.description}
                             onChange={(e) => set(i, { description: e.target.value })}
-                            placeholder="e.g. Reputation Management — 60 users"
+                            placeholder="e.g. Reputation Management"
                             className="h-8"
                             required
                           />
@@ -417,7 +417,7 @@ function prefilledLines(lead: Lead, intelligence: OpportunityIntelligence | null
   const asked = uncoveredRequirements({ items: [], lead, intelligence });
   if (asked.length === 0) return [blankLine()];
   return asked.map((name) => ({
-    description: users ? `${name} — ${users.toLocaleString("en-US")} users` : name,
+    description: name,
     quantity: users ?? 1,
     unit_price: 0,
     discount_pct: 0,

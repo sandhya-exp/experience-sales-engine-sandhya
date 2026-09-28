@@ -201,7 +201,7 @@ function QuoteReview({ quote, status, company, isAdmin, previous }: { quote: Quo
               <thead className="bg-muted/40 text-[11px] uppercase tracking-wide text-muted-foreground">
                 <tr>
                   <th className="px-3 py-1.5 text-left font-semibold">Product / service</th>
-                  <th className="px-3 py-1.5 text-right font-semibold">Qty</th>
+                  <th className="px-3 py-1.5 text-right font-semibold">Users</th>
                   <th className="px-3 py-1.5 text-right font-semibold">Price</th>
                   <th className="px-3 py-1.5 text-right font-semibold">Discount</th>
                   <th className="px-3 py-1.5 text-right font-semibold">Total</th>
@@ -374,7 +374,7 @@ function WhatChanged({ from, to, diff }: { from: number; to: number; diff: Retur
       </summary>
       <ul className="space-y-1 border-t border-border px-3 py-2.5 text-[12.5px]">
         {diff.added.map((i) => (
-          <li key={`a-${i.description}`} className="text-success">+ Added {i.description} — {i.quantity} × {formatMoney(i.unit_price)}</li>
+          <li key={`a-${i.description}`} className="text-success">+ Added {i.description} — {i.quantity} users × {formatMoney(i.unit_price)}</li>
         ))}
         {diff.removed.map((i) => (
           <li key={`r-${i.description}`} className="text-destructive">− Removed {i.description}</li>

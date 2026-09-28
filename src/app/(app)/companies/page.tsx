@@ -121,7 +121,15 @@ export default async function CompaniesPage({ searchParams }: PageProps<"/compan
                           <Building2 className="h-3.5 w-3.5" />
                         </span>
                         <p className="truncate text-[15px] font-semibold text-foreground">{c.name}</p>
-                        {c.won_count > 0 && <span className="rounded bg-success/10 px-1.5 py-0.5 text-[10px] font-semibold text-success">Customer</span>}
+                        {/* Every row says which side of the line it is on, so "All accounts"
+                            reads as two kinds of account rather than one undifferentiated list. */}
+                        {c.won_count > 0 ? (
+                          <span className="rounded bg-success/10 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-success">
+                            Customer{c.won_count > 1 ? ` · ${c.won_count} won` : ""}
+                          </span>
+                        ) : (
+                          <span className="rounded bg-primary/10 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-primary">Prospect</span>
+                        )}
                         {c.industry && <span className="rounded bg-muted px-1.5 py-0.5 text-[11px] text-muted-foreground">{c.industry}</span>}
                       </div>
                       <p className="mt-1 text-[13px] text-muted-foreground">

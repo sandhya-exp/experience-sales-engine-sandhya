@@ -5,6 +5,8 @@ import { WorkspaceTabs } from "@/components/workspace/workspace-tabs";
 import { OverviewTab } from "@/components/workspace/overview-tab";
 import { ContactsTab } from "@/components/workspace/contacts-tab";
 import { ActivityTab } from "@/components/workspace/activity-tab";
+import { CallRecapCard } from "@/components/workspace/call-recap-card";
+import { InboundReplyCard } from "@/components/workspace/inbound-reply-card";
 import { QualificationTab } from "@/components/workspace/qualification-tab";
 import { AiBriefTab } from "@/components/workspace/ai-brief-tab";
 import { nextFollowUpFor } from "@/lib/repo/followups";
@@ -71,7 +73,17 @@ export default async function LeadWorkspacePage({ params, searchParams }: PagePr
           defaultTab={tab}
           overview={<OverviewTab lead={lead} company={company} brief={brief} contacts={contacts} activities={activities} />}
           contacts={<ContactsTab leadId={lead.id} companyId={company.id} contacts={contacts} />}
-          activity={<ActivityTab leadId={lead.id} activities={activities} briefs={briefHistory} quotes={quotes} leadCreatedAt={lead.created_at} companyName={company.name} />}
+          activity={
+            <div className="space-y-4">
+              {/* The conversation's raw material — a discovery call to process,
+                  an email reply to confirm — sits with the rest of the
+                  conversation. Confirming facts here re-runs the analysis on
+                  the AI Intelligence tab. */}
+              <CallRecapCard leadId={lead.id} latest={callRecap} />
+              <InboundReplyCard leadId={lead.id} latest={inboundReply} />
+              <ActivityTab leadId={lead.id} activities={activities} briefs={briefHistory} quotes={quotes} leadCreatedAt={lead.created_at} companyName={company.name} />
+            </div>
+          }
           qualification={<QualificationTab lead={lead} contacts={contacts} focus={focus} />}
           quotes={<QuotesTab leadId={lead.id} lead={lead} company={company} quotes={quotes} isAdmin={canApprove} intelligence={hasIntelligence(brief) ? brief.intelligence : null} />}
           brief={
@@ -83,8 +95,6 @@ export default async function LeadWorkspacePage({ params, searchParams }: PagePr
               autoMode={autoMode}
               providerLabel={providerLabel}
               lastReply={lastReply}
-              callRecap={callRecap}
-              inboundReply={inboundReply}
               quote={quote ? { version: quote.meta.version, status: quote.meta.status, total: formatMoney(quote.meta.total) } : null}
             />
           }

@@ -113,7 +113,7 @@ export function buildTimeline(activities: Activity[], briefs: AiDealBrief[], lea
         actor: "customer",
         actorName: a.actor_name ?? "Customer",
         milestone: false,
-        href: `/leads/${leadId}?tab=brief`,
+        href: `/leads/${leadId}?tab=activity`,
         activity: a,
       });
       if (factCount > 0) {
@@ -125,7 +125,7 @@ export function buildTimeline(activities: Activity[], briefs: AiDealBrief[], lea
           actor: "ai",
           actorName: "AI agent",
           milestone: false,
-          href: `/leads/${leadId}?tab=brief`,
+          href: `/leads/${leadId}?tab=activity`,
         });
       }
       continue;

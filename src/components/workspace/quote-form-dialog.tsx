@@ -66,7 +66,13 @@ export function QuoteFormDialog({
   const [pending, start] = useTransition();
   const editing = Boolean(existing && activityId);
 
-  const [items, setItems] = useState<QuoteLineItem[]>(existing?.line_items?.length ? existing.line_items : [blankLine()]);
+  // A new quote starts from what the record already knows rather than a blank
+  // row: one line per product the customer asked about, sized to the user count
+  // they gave. Prices stay empty on purpose — there is no price book in the
+  // record to take them from, and a price is a person's decision.
+  const [items, setItems] = useState<QuoteLineItem[]>(() =>
+    existing?.line_items?.length ? existing.line_items : prefilledLines(lead, intelligence)
+  );
   const [startDate, setStartDate] = useState(existing?.start_date ?? format(new Date(), "yyyy-MM-dd"));
   const [termMonths, setTermMonths] = useState(String(existing?.term_months ?? 12));
   const [addlDiscount, setAddlDiscount] = useState(String(existing?.additional_discount_pct ?? 0));
@@ -183,8 +189,8 @@ export function QuoteFormDialog({
                   <tr>
                     <th className="w-8 px-2 py-1.5 text-left font-semibold">#</th>
                     <th className="px-2 py-1.5 text-left font-semibold">Product / service</th>
-                    <th className="w-20 px-2 py-1.5 text-right font-semibold">Qty</th>
-                    <th className="w-28 px-2 py-1.5 text-right font-semibold">List unit price</th>
+                    <th className="w-20 px-2 py-1.5 text-right font-semibold" title="Seats on the subscription">Users</th>
+                    <th className="w-28 px-2 py-1.5 text-right font-semibold" title="List price per user for the term">Price / user</th>
                     <th className="w-24 px-2 py-1.5 text-right font-semibold">Disc %</th>
                     <th className="w-24 px-2 py-1.5 text-right font-semibold">Net unit</th>
                     <th className="w-24 px-2 py-1.5 text-center font-semibold">Approval</th>
@@ -203,7 +209,7 @@ export function QuoteFormDialog({
                             name={`item_${i}_description`}
                             value={it.description}
                             onChange={(e) => set(i, { description: e.target.value })}
-                            placeholder="e.g. Reputation Management — 60 users"
+                            placeholder="e.g. Reputation Management"
                             className="h-8"
                             required
                           />
@@ -404,6 +410,18 @@ function Row({ label, value }: { label: string; value: string }) {
       <dd className="text-foreground">{value}</dd>
     </div>
   );
+}
+
+function prefilledLines(lead: Lead, intelligence: OpportunityIntelligence | null): QuoteLineItem[] {
+  const users = lead.number_of_users && lead.number_of_users > 0 ? lead.number_of_users : null;
+  const asked = uncoveredRequirements({ items: [], lead, intelligence });
+  if (asked.length === 0) return [blankLine()];
+  return asked.map((name) => ({
+    description: name,
+    quantity: users ?? 1,
+    unit_price: 0,
+    discount_pct: 0,
+  }));
 }
 
 function blankLine(): QuoteLineItem {

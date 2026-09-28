@@ -174,6 +174,10 @@ export function buildTimeline(activities: Activity[], briefs: AiDealBrief[], lea
       events.push({ id: a.id, at: iso(a.occurred_at), label: "Owner assigned", detail: a.body, actor: a.actor_name === "System" ? "system" : "team", actorName: a.actor_name ?? "System", milestone: false, activity: a });
       continue;
     }
+    if (kind === "no_show") {
+      events.push({ id: a.id, at: iso(a.occurred_at), label: "Customer no-showed", detail: a.body, actor: a.actor_name === "System" ? "system" : "team", actorName: a.actor_name ?? "Team", milestone: true, activity: a });
+      continue;
+    }
 
     if (a.type === "status_change") {
       const to = String(m.to ?? "").toLowerCase();

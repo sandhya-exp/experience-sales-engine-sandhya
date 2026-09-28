@@ -41,6 +41,7 @@ export function activityLabel(type: ActivityType, metadata?: Record<string, unkn
   if (metadata?.kind === "call_recap") return "Call processed with AI";
   if (metadata?.kind === "booking_confirmation_email") return "Booking confirmation email";
   if (metadata?.kind === "booking_confirmation_sms") return "Booking confirmation text";
+  if (metadata?.kind === "no_show") return "Call no-show";
   if (metadata?.kind === "inbound_reply") return "Inbound email reply";
   return ACTIVITY_TYPE_LABELS[type];
 }

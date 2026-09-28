@@ -8,6 +8,7 @@
     "start": "next start",
     "lint": "eslint",
     "db:schema": "node scripts/db-schema.mjs",
+    "db:indexes": "node scripts/db-indexes.mjs",
     "db:seed": "tsx db/seed.ts",
     "db:seed-history": "tsx db/seed-sales-history.ts",
     "db:setup": "npm run db:schema && npm run db:seed",

@@ -15,7 +15,18 @@ export function getPool() {
     }
     // Hosted Postgres (Supabase, Neon, RDS…) requires TLS; local Postgres usually has none.
     const local = /localhost|127\.0\.0\.1/.test(connectionString);
-    pool = new Pool({ connectionString, ssl: local ? undefined : { rejectUnauthorized: false }, max: 5 });
+    pool = new Pool({
+      connectionString,
+      ssl: local ? undefined : { rejectUnauthorized: false },
+      max: 5,
+      // Serverless: a function instance handles a burst of page renders, each
+      // of which runs 8-12 queries in parallel. Keep the connection warm
+      // between requests to that instance rather than reconnecting (TLS
+      // handshake + auth to a hosted database costs ~100-200ms each time).
+      idleTimeoutMillis: 60_000,
+      keepAlive: true,
+      connectionTimeoutMillis: 10_000,
+    });
   }
   return pool;
 }

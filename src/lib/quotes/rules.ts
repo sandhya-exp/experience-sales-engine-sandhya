@@ -3,6 +3,7 @@ import type { OpportunityIntelligence } from "@/lib/ai/intelligence";
 import type { QuoteApprovalStep } from "@/lib/repo/quotes";
 import { computeTotals, type QuoteAdjustments, type QuoteLineItem } from "@/lib/quotes/math";
 import { parseBudget } from "@/lib/quotes/review";
+import { findProduct, PRICE_LIST } from "@/lib/catalog/catalog";
 
 /**
  * Discount rules, and the approval chain they produce.
@@ -82,6 +83,22 @@ export function approvalChainFor(args: { items: QuoteLineItem[]; lead: Lead; int
       reason: `Discount of ${totals.discount_pct}% is above the ${rules.adminPct}% a manager may approve alone.`,
       state: "pending",
     });
+  }
+
+  // The price list is the authority on each product: a line discounted past its
+  // product's ceiling, or priced below list without using the discount field,
+  // is an admin decision whatever the quote-level percentage says.
+  for (const it of args.items) {
+    const p = findProduct(it.description);
+    if (!p) continue;
+    const effective = p.list_price > 0 ? Math.round((1 - (it.unit_price * (1 - it.discount_pct / 100)) / p.list_price) * 1000) / 10 : 0;
+    if (effective > p.max_discount_pct && !steps.some((s) => s.role === "admin")) {
+      steps.push({
+        role: "admin",
+        reason: `${p.name} is ${effective}% below its list price, past the ${p.max_discount_pct}% ceiling on the ${PRICE_LIST.version} price list.`,
+        state: "pending",
+      });
+    }
   }
 
   // Pricing above what the customer told us they had is a commercial decision

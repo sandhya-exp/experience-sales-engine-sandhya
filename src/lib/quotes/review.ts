@@ -3,14 +3,15 @@ import type { OpportunityIntelligence } from "@/lib/ai/intelligence";
 import type { QuoteReview } from "@/lib/repo/quotes";
 import { computeTotals, type QuoteAdjustments, type QuoteLineItem } from "@/lib/quotes/math";
 
+import { findProduct } from "@/lib/catalog/catalog";
+
 /**
  * The quote check.
  *
- * Deterministic, and deliberately small: there are no pricing rules in this
- * product to encode, so the review does not invent any. It checks the quote a
- * person entered against the two things the record actually knows — the
- * discount threshold this deployment set, and what the customer and the
- * qualification already said — and names each problem in one sentence. A
+ * Deterministic, and deliberately small. It checks the quote a person entered
+ * against what the record actually knows — the discount threshold this
+ * deployment set, the price list in `@/lib/catalog`, and what the customer and
+ * the qualification already said — and names each problem in one sentence. A
  * quote that trips the discount threshold or exceeds a stated budget needs an
  * admin's approval before it can go to the customer.
  */
@@ -45,6 +46,16 @@ export function reviewQuote(args: {
   if (budget && totals.total > budget.amount) {
     issues.push(`Total ${money(totals.total)} exceeds the customer's stated budget context (${args.lead.qualification?.budget}).`);
     needsApproval = true;
+  }
+
+  // Against the price list: a line priced below list without the discount
+  // field hides a discount from the approval rules, so it is named.
+  for (const it of args.items) {
+    const p = findProduct(it.description);
+    if (p && it.unit_price > 0 && it.unit_price < p.list_price) {
+      issues.push(`${p.name} is priced at ${money(it.unit_price)} against a ${money(p.list_price)} list price — record the difference as a discount.`);
+      needsApproval = true;
+    }
   }
 
   const readiness = args.intelligence?.readiness;

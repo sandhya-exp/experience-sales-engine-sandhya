@@ -6,6 +6,7 @@ import { buildHandoffPayload, deliverHandoff } from "@/lib/handoff";
 import { DOWNSTREAM } from "@/lib/modules";
 import { redirect } from "next/navigation";
 import { z } from "zod";
+import { INTEREST_OPTIONS } from "@/lib/inquiry-schema";
 import { getCurrentUser } from "@/lib/auth";
 import { assertContractAccess } from "@/lib/authz";
 import { recordActivity } from "@/lib/repo/activities";
@@ -184,14 +185,16 @@ export async function createQuoteHandoffAction(leadId: string): Promise<HandoffR
 }
 
 const ManualLeadSchema = z.object({
-  companyName: z.string().min(1),
-  contactName: z.string().min(1),
-  email: z.string().email(),
-  phone: z.string().optional(),
-  numberOfUsers: z.coerce.number().int().positive(),
-  interest: z.string().min(1),
+  companyName: z.string().trim().min(1, "Enter the company name."),
+  contactName: z.string().trim().min(1, "Enter the contact's name."),
+  email: z.string().trim().email("Enter a valid work email, e.g. name@company.com."),
+  phone: z.string().trim().min(1, "Enter a phone number — sales reaches a phone-in lead by phone."),
+  numberOfUsers: z.coerce.number({ message: "Enter the number of users as a number." }).int("Enter a whole number of users.").positive("Enter at least 1 user."),
+  // Same choices as the public Talk to Sales form, so a phone-in lead lands in
+  // the same product areas the AI and the catalog already understand.
+  interest: z.enum(INTEREST_OPTIONS, { message: "Choose what they're interested in." }),
   industry: z.string().optional(),
-  requirements: z.string().min(1),
+  requirements: z.string().trim().min(1, "Note what they asked for, even a sentence."),
 });
 
 export interface ManualLeadFormState {
@@ -208,7 +211,7 @@ export async function createManualLeadAction(
     companyName: formData.get("companyName"),
     contactName: formData.get("contactName"),
     email: formData.get("email"),
-    phone: formData.get("phone") || undefined,
+    phone: formData.get("phone"),
     numberOfUsers: formData.get("numberOfUsers"),
     interest: formData.get("interest"),
     industry: formData.get("industry") || undefined,

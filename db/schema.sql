@@ -112,6 +112,20 @@ create table if not exists activities (
 
 create index if not exists activities_lead_idx on activities (lead_id, occurred_at desc);
 
+-- Most of the app's reads are "this kind of record" — quotes, follow-ups,
+-- agent actions, call recaps, inbound replies, deal history, approval requests
+-- — all stored as activities keyed by metadata->>'kind'. Without an
+-- expression index each of those is a full scan of activities. Both are
+-- idempotent and run on the next `npm run db:schema`.
+create index if not exists activities_kind_idx on activities ((metadata->>'kind'), occurred_at desc);
+create index if not exists activities_type_time_idx on activities (type, occurred_at desc);
+create index if not exists activities_occurred_idx on activities (occurred_at desc);
+create index if not exists leads_owner_idx on leads (owner_user_id);
+create index if not exists leads_created_idx on leads (created_at desc);
+create index if not exists contacts_company_idx on contacts (company_id);
+create index if not exists contacts_email_idx on contacts (lower(email));
+create index if not exists companies_domain_idx on companies (domain);
+
 create table if not exists ai_deal_briefs (
   id uuid primary key default gen_random_uuid(),
   lead_id uuid not null references leads(id) on delete cascade,

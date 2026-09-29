@@ -22,16 +22,21 @@ export function FunnelCustomers({ leads, stage, now }: { leads: FunnelLead[]; st
     const leftAt = movedOn && next ? l.entered[next] ?? null : l.lost && l.furthest === stage ? l.endedAt : null;
     const stillHere = !movedOn && !l.lost && l.current === stage;
     const days = Math.max(0, Math.round(((leftAt ?? (stillHere ? now : l.endedAt ?? now)) - enteredAt) / 86_400_000));
-    const outcome = l.status === "won" && stage === "won"
-      ? { label: "Won", variant: "success" as const, order: 3 }
-      : movedOn
-        ? { label: "Moved on", variant: "navy" as const, order: 3 }
-        : l.lost
-          ? { label: l.furthest === stage ? "Lost here" : "Lost later", variant: "destructive" as const, order: 1 }
+    const outcome = l.status === "won"
+      ? { label: "Won", variant: "success" as const, order: 4 }
+      : l.lost
+        ? l.furthest === stage
+          ? { label: "Lost here", variant: "destructive" as const, order: 1 }
+          : { label: "Lost later", variant: "outline" as const, order: 2 }
+        : movedOn
+          ? { label: "Still in journey", variant: "navy" as const, order: 3 }
           : { label: "Still here", variant: "warning" as const, order: 0 };
+    // Where and why it ended, or why it is stuck.
     let reason: string | null = null;
-    if (l.lost) reason = l.lostReason ?? "Not recorded";
-    else if (stillHere) {
+    if (l.lost) {
+      const at = FUNNEL_STAGES.find((s) => s.key === l.furthest)?.label ?? l.furthest;
+      reason = `${at}${l.lostReason ? ` · ${l.lostReason}` : ""}`;
+    } else if (stillHere) {
       const quiet = l.lastActivityAt ? Math.floor((now - l.lastActivityAt) / 86_400_000) : null;
       if (l.missedFollowUp) reason = "Missed follow-up";
       else if (quiet !== null && quiet >= 3) reason = `No activity for ${quiet} days`;
@@ -48,8 +53,8 @@ export function FunnelCustomers({ leads, stage, now }: { leads: FunnelLead[]; st
         <TableRow>
           <TableHead>Customer</TableHead>
           <TableHead>Time in stage</TableHead>
-          <TableHead>Outcome</TableHead>
-          <TableHead>Drop-off reason</TableHead>
+          <TableHead>Journey outcome</TableHead>
+          <TableHead>Lost at · reason / why stuck</TableHead>
           <TableHead className="w-40 text-right"></TableHead>
         </TableRow>
       </TableHeader>

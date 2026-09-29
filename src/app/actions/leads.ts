@@ -23,6 +23,9 @@ import { findOrCreateCompanyForEmail } from "@/lib/repo/companies";
 import type { ActivityType, LeadStatus, Qualification, QualificationStatus } from "@/lib/types";
 import { getLeadContextOrThrow, regenerateBriefFor } from "@/lib/ai/service";
 import { refreshOpportunity } from "@/lib/ai/agent";
+import { scheduleRefresh } from "@/lib/ai/background";
+import { briefIsStale } from "@/lib/ai/staleness";
+import { getLatestBrief } from "@/lib/repo/aiBriefs";
 
 async function actorName() {
   const user = await getCurrentUser();
@@ -64,12 +67,9 @@ export async function updateQualificationAction(leadId: string, formData: FormDa
   // The brief's "missing information" and next step are derived from exactly
   // these fields — refresh it so the Overview never shows stale gaps, and let
   // the agent re-decide: filling a gap by hand should retire the action that
-  // existed to close it.
-  try {
-    await refreshOpportunity(leadId, { actorName: name });
-  } catch (err) {
-    console.error("Brief refresh after qualification save failed (non-fatal):", err);
-  }
+  // existed to close it. In the background: the save returns now, the page
+  // shows "Updating AI intelligence…" until the new brief lands.
+  await scheduleRefresh(leadId, { actorName: name }, ["/", "/pipeline"]);
   revalidatePath(`/leads/${leadId}`);
   revalidatePath("/");
   revalidatePath("/pipeline");
@@ -116,6 +116,8 @@ export async function updateContactAction(leadId: string, contactId: string, for
 }
 
 export async function regenerateBriefAction(leadId: string) {
+  // Explicit request: the person asked for the AI to run, so this one waits.
+  // (The streamed variant with stage progress is /api/leads/[id]/ai.)
   await refreshOpportunity(leadId, { actorName: await actorName() });
   revalidatePath(`/leads/${leadId}`);
   revalidatePath("/");
@@ -143,10 +145,13 @@ export async function createQuoteHandoffAction(leadId: string): Promise<HandoffR
   const h = await headers();
   const origin = `${h.get("x-forwarded-proto") ?? "http"}://${h.get("x-forwarded-host") ?? h.get("host") ?? "localhost:3000"}`;
 
-  // Refresh the AI Deal Brief first so the quote side receives a current
-  // narrative rather than one generated before qualification was completed.
+  // The quote side must receive a current narrative. Background refreshes
+  // keep the brief current after every change, so regenerate here only when
+  // the record has moved since the last brief — otherwise reuse it.
   try {
-    await regenerateBriefFor(await getLeadContextOrThrow(leadId));
+    const ctx = await getLeadContextOrThrow(leadId);
+    const latest = await getLatestBrief(leadId);
+    if (briefIsStale(ctx.lead, ctx.activities, latest)) await regenerateBriefFor(ctx);
   } catch (err) {
     console.error("Brief refresh before handoff failed (non-fatal):", err);
   }
@@ -235,11 +240,8 @@ export async function createManualLeadAction(
     requirements: data.requirements,
   });
   if (user) await ensureSeedOwnerAssigned(lead.id, user.id);
-  try {
-    await refreshOpportunity(lead.id, { actorName: user?.name ?? "System" });
-  } catch (err) {
-    console.error("Initial AI brief generation failed (non-fatal):", err);
-  }
+  // First brief and first proposed action run after the redirect has been sent.
+  await scheduleRefresh(lead.id, { actorName: user?.name ?? "System" }, ["/", "/pipeline"]);
   revalidatePath("/");
   revalidatePath("/pipeline");
   redirect(`/leads/${lead.id}`);
@@ -285,7 +287,10 @@ export async function prepareGuidedSellingAction(leadId: string): Promise<Prepar
     await updateLeadStatus(leadId, "qualified", name);
     ctx = await getLeadContextOrThrow(leadId);
   }
-  const brief = await regenerateBriefFor(ctx);
+  // Same rule as the handoff: a current brief is required here, so regenerate
+  // only if the record has changed since the last one.
+  const latest = await getLatestBrief(leadId);
+  const brief = latest && !briefIsStale(ctx.lead, ctx.activities, latest) ? latest : await regenerateBriefFor(ctx);
   const user = await getCurrentUser();
   await recordActivity({
     leadId,

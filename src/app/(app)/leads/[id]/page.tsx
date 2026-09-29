@@ -24,6 +24,8 @@ import { QuotesTab } from "@/components/workspace/quotes-tab";
 import { NextStepBanner } from "@/components/workspace/next-step-banner";
 import { autoModeFor } from "@/lib/ai/actions";
 import { emailProvider } from "@/lib/email/provider";
+import { intelligenceState } from "@/lib/ai/staleness";
+import { IntelligenceStatus } from "@/components/workspace/intelligence-status";
 
 export default async function LeadWorkspacePage({ params, searchParams }: PageProps<"/leads/[id]">) {
   const { id } = await params;
@@ -52,6 +54,9 @@ export default async function LeadWorkspacePage({ params, searchParams }: PagePr
   const quote = activeQuote(quotes);
   const provider = emailProvider();
   const providerLabel = provider.mode === "live" ? `Sending via ${provider.name}` : "Development provider — messages are recorded, not delivered";
+  // Is the brief current with the record? A background refresh is in flight
+  // when it isn't; the status chip polls until the new brief lands.
+  const intel = intelligenceState(lead, activities, brief);
   const focusField = hasIntelligence(brief) ? (brief.intelligence.next_action.field ?? brief.intelligence.gaps.missing.find((m) => m.field)?.field ?? null) : null;
 
   return (
@@ -70,6 +75,11 @@ export default async function LeadWorkspacePage({ params, searchParams }: PagePr
       />
       {/* The conclusion, above the tabs: what to do next, with a link to why. */}
       <div className="px-6 pt-5">
+        {intel.state !== "fresh" && (
+          <div className="mx-auto mb-2 flex max-w-6xl justify-end">
+            <IntelligenceStatus leadId={lead.id} state={intel.state} />
+          </div>
+        )}
         <NextStepBanner leadId={lead.id} brief={brief} action={agentAction} />
       </div>
       <div className="mx-auto max-w-6xl px-6 py-6">

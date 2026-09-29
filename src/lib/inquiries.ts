@@ -4,7 +4,7 @@ import { assignLeadOwner } from "@/lib/repo/leads";
 import { findOrCreateCompanyForEmail } from "@/lib/repo/companies";
 import { findOrCreateContactForInquiry } from "@/lib/repo/contacts";
 import { createLead } from "@/lib/repo/leads";
-import { refreshOpportunity } from "@/lib/ai/agent";
+import { scheduleRefresh } from "@/lib/ai/background";
 
 /**
  * One way in for every inbound channel — the /inquire web form, the internal
@@ -38,13 +38,9 @@ export async function createInquiryLead(data: InquiryInputType, source: string) 
     console.error("Lead routing failed (non-fatal, lead stays unassigned):", err);
   }
 
-  // First AI Deal Brief straight away, and the agent's first proposed action
-  // with it; failure here must never lose the lead.
-  try {
-    await refreshOpportunity(lead.id, { actorName: "System" });
-  } catch (err) {
-    console.error("Initial AI brief generation failed (non-fatal):", err);
-  }
+  // First AI Deal Brief and the agent's first proposed action — after the
+  // customer has their confirmation page. A prospect never waits on the AI.
+  await scheduleRefresh(lead.id, { actorName: "System" }, ["/", "/pipeline"]);
 
   return { lead, company, contact, companyMatched: matched };
 }

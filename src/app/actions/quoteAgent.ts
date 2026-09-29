@@ -5,7 +5,7 @@ import { getCurrentUser } from "@/lib/auth";
 import { prepareQuote, type QuoteProposal } from "@/lib/ai/quoteAgent";
 import { runTool, SalesToolTrace, type SalesToolCall } from "@/lib/ai/salesTools";
 import { recordActivity } from "@/lib/repo/activities";
-import { refreshOpportunity } from "@/lib/ai/agent";
+import { scheduleRefresh } from "@/lib/ai/background";
 import type { PriceRequestLine } from "@/lib/catalog/pricing";
 
 /** Run the quote-preparation agent. Reads and computes only; nothing is saved but a trace note. */
@@ -38,11 +38,7 @@ export async function createDraftFromProposalAction(leadId: string, lines: Price
   const clean = lines.map((l) => ({ product_code: String(l.product_code), quantity: Number(l.quantity), discount_pct: Number(l.discount_pct ?? 0) }));
   const r = await runTool("create_quote_draft", { lead_id: leadId, lines: clean }, { actorName: user.name, trace });
   if (!r.ok) return { ok: false, detail: r.error ?? "Could not create the draft.", trace: trace.calls };
-  try {
-    await refreshOpportunity(leadId, { actorName: user.name });
-  } catch (err) {
-    console.error("Refresh after AI draft failed (non-fatal):", err);
-  }
+  await scheduleRefresh(leadId, { actorName: user.name }, ["/quotes"]);
   revalidatePath(`/leads/${leadId}`);
   revalidatePath("/quotes");
   return { ok: true, detail: `Draft quote created — ${r.summary}.`, trace: trace.calls };

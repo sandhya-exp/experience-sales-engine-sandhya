@@ -6,7 +6,7 @@ import { getLeadContextOrThrow } from "@/lib/ai/service";
 import { getInboundReply, patchInboundReply } from "@/lib/repo/inboundReply";
 import { planCallRecapApplication } from "@/lib/ai/callRecap";
 import { applyCustomerFacts } from "@/lib/ai/actions";
-import { refreshOpportunity } from "@/lib/ai/agent";
+import { scheduleRefresh } from "@/lib/ai/background";
 
 function revalidateLead(leadId: string) {
   revalidatePath(`/leads/${leadId}`);
@@ -57,11 +57,7 @@ export async function confirmInboundReplyFactsAction(leadId: string, activityId:
     confirmed_by: user.name,
   });
 
-  try {
-    await refreshOpportunity(leadId);
-  } catch (err) {
-    console.error("Brief refresh after inbound reply confirmation failed (non-fatal):", err);
-  }
+  await scheduleRefresh(leadId, {}, ["/", "/pipeline"]);
 
   revalidateLead(leadId);
   return { ok: true, detail: plan.applied.length ? `Applied: ${plan.applied.join(", ")}.` : "Nothing new to apply — the record already had this." };

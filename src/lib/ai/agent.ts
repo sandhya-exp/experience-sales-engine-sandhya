@@ -8,6 +8,7 @@ import { extractFromReply, planReplyApplication, type ReplyExtraction } from "@/
 import { getAgentAction, patchActivityMetadata, patchAgentAction, recordCustomerReply, type AgentActionRow, type CustomerReplyMeta, CUSTOMER_REPLY_KIND } from "@/lib/repo/agentActions";
 import { hasIntelligence } from "@/lib/ai/briefGuards";
 import type { OpportunityIntelligence } from "@/lib/ai/intelligence";
+import type { AiProgressStage } from "@/lib/ai/progress";
 
 /**
  * The agent loop, in one place.
@@ -31,6 +32,8 @@ export interface RefreshOptions {
   now?: Date;
   /** Skip proposing (used where only the brief matters, e.g. just before the handoff). */
   proposeAction?: boolean;
+  /** Progress for a UI that chose to wait. Reporting never changes what runs. */
+  onStage?: (stage: AiProgressStage) => void;
 }
 
 export interface RefreshResult {
@@ -42,11 +45,13 @@ export interface RefreshResult {
 
 /** Regenerate the intelligence and decide what to do next. */
 export async function refreshOpportunity(leadId: string, opts: RefreshOptions = {}): Promise<RefreshResult> {
+  opts.onStage?.("read");
   const ctx = await getLeadContextOrThrow(leadId);
-  const brief = await regenerateBriefFor(ctx);
+  const brief = await regenerateBriefFor(ctx, { now: opts.now, onStage: opts.onStage });
   const intelligence = hasIntelligence(brief) ? brief.intelligence : null;
   if (!intelligence || opts.proposeAction === false) return { intelligence, action: null, executed: null };
 
+  opts.onStage?.("propose");
   const senderName = await senderFor(ctx.lead.owner_user_id);
   const action = await proposeAgentAction(
     { lead: ctx.lead, company: ctx.company, contacts: ctx.contacts, activities: ctx.activities, intelligence, now: opts.now },
@@ -126,7 +131,9 @@ export async function handleCustomerReply(args: {
   actorName: string;
   mode?: "auto" | "deterministic";
   now?: Date;
+  onStage?: (stage: AiProgressStage) => void;
 }): Promise<ReplyResult> {
+  args.onStage?.("extract");
   const before = await getLeadContextOrThrow(args.leadId);
   const beforeBrief = await getLatestBrief(args.leadId);
   const beforeIntel = hasIntelligence(beforeBrief) ? beforeBrief.intelligence : null;
@@ -173,7 +180,7 @@ export async function handleCustomerReply(args: {
     }
   }
 
-  const after = await refreshOpportunity(args.leadId, { mode: args.mode, now: args.now });
+  const after = await refreshOpportunity(args.leadId, { mode: args.mode, now: args.now, onStage: args.onStage });
 
   const gapsBefore = (beforeIntel?.gaps.missing ?? []).map((m) => m.label);
   const gapsAfter = (after.intelligence?.gaps.missing ?? []).map((m) => m.label);

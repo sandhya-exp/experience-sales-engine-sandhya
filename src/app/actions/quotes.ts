@@ -6,7 +6,7 @@ import { getLeadById } from "@/lib/repo/leads";
 import { getLatestBrief } from "@/lib/repo/aiBriefs";
 import { hasIntelligence } from "@/lib/ai/briefGuards";
 import { recordActivity } from "@/lib/repo/activities";
-import { refreshOpportunity } from "@/lib/ai/agent";
+import { scheduleRefresh } from "@/lib/ai/background";
 import {
   effectiveStatus,
   formatMoney,
@@ -252,11 +252,7 @@ async function transition(activityId: string, leadId: string, meta: QuoteMeta, s
 
 /** Quotes change what the agent should propose next, so the loop runs again. */
 async function afterChange(leadId: string, actorName: string) {
-  try {
-    await refreshOpportunity(leadId, { actorName });
-  } catch (err) {
-    console.error("Refresh after quote change failed (non-fatal):", err);
-  }
+  await scheduleRefresh(leadId, { actorName }, ["/", "/pipeline", "/quotes"]);
   revalidate(leadId);
 }
 

@@ -10,7 +10,9 @@ import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
-import { approveAgentAction, customerReplyAction, declineAgentActionAction, refreshAgentAction, setAutoModeAction } from "@/app/actions/agent";
+import { useRouter } from "next/navigation";
+import { approveAgentAction, declineAgentActionAction, setAutoModeAction } from "@/app/actions/agent";
+import { AiProgress, useAiRun } from "@/components/workspace/ai-progress";
 import type { AgentActionRow, AgentRisk, CustomerReplyMeta } from "@/lib/repo/agentActions";
 import { DELIVERY_LABEL } from "@/lib/email/provider";
 
@@ -51,6 +53,8 @@ export function AgentActionCard({
   lastReply?: { occurredAt: string; meta: CustomerReplyMeta } | null;
 }) {
   const [pending, startTransition] = useTransition();
+  const router = useRouter();
+  const check = useAiRun(leadId);
 
   if (!action) {
     return (
@@ -62,14 +66,29 @@ export function AgentActionCard({
             </span>
             AI Actions
           </CardTitle>
-          <Button size="sm" variant="outline" disabled={pending} onClick={() => startTransition(async () => { toast.message((await refreshAgentAction(leadId)).detail); })}>
-            Check again
+          <Button
+            size="sm"
+            variant="outline"
+            disabled={check.running}
+            onClick={async () => {
+              const r = await check.run({ op: "refresh" });
+              if (r.ok) {
+                toast.message(r.detail);
+                router.refresh();
+              } else toast.error(r.detail);
+            }}
+          >
+            {check.running ? "Checking…" : "Check again"}
           </Button>
         </CardHeader>
         <CardContent className="pt-0">
-          <p className="text-[13px] text-muted-foreground">
-            Nothing to do here right now — the agent proposes an action only when the record gives it one to take.
-          </p>
+          {check.running ? (
+            <AiProgress op="refresh" stage={check.stage} className="mb-2" />
+          ) : (
+            <p className="text-[13px] text-muted-foreground">
+              Nothing to do here right now — the agent proposes an action only when the record gives it one to take.
+            </p>
+          )}
           {lastReply && <CustomerResponsePanel reply={lastReply} />}
         </CardContent>
       </Card>
@@ -353,7 +372,8 @@ function WaitingForReply({ leadId, inReplyTo }: { leadId: string; inReplyTo: str
 function ReplyBox({ leadId, inReplyTo, startOpen = false, onClose }: { leadId: string; inReplyTo: string; startOpen?: boolean; onClose?: () => void }) {
   const [open, setOpen] = useState(startOpen);
   const [text, setText] = useState("");
-  const [pending, startTransition] = useTransition();
+  const router = useRouter();
+  const { run, stage, running: pending } = useAiRun(leadId);
   const [result, setResult] = useState<{ applied: string[]; resolvedGaps: string[]; readinessBefore: string | null; readinessAfter: string | null; nextAction: string | null } | null>(null);
 
   if (result) {
@@ -381,7 +401,7 @@ function ReplyBox({ leadId, inReplyTo, startOpen = false, onClose }: { leadId: s
             </li>
           )}
         </ul>
-        <p className="mt-2 text-[11px] text-muted-foreground">Refresh the page to see the regenerated intelligence.</p>
+        <p className="mt-2 text-[11px] text-muted-foreground">The intelligence and next action above have been regenerated.</p>
       </div>
     );
   }
@@ -399,24 +419,21 @@ function ReplyBox({ leadId, inReplyTo, startOpen = false, onClose }: { leadId: s
           </Label>
           <Textarea id="agent-reply" rows={4} value={text} onChange={(e) => setText(e.target.value)} placeholder="Paste what the customer wrote back." />
           <p className="mt-1 text-[11px] text-muted-foreground">Only facts that can be quoted from this text are written to the opportunity.</p>
+          {pending && <AiProgress op="reply" stage={stage} className="mt-2" />}
           <div className="mt-2 flex gap-2">
             <Button
               size="sm"
               disabled={pending || !text.trim()}
-              onClick={() =>
-                startTransition(async () => {
-                  const fd = new FormData();
-                  fd.set("text", text);
-                  fd.set("inReplyTo", inReplyTo);
-                  const r = await customerReplyAction(leadId, fd);
-                  if (!r.ok) {
-                    toast.error(r.detail);
-                    return;
-                  }
-                  toast.success(r.detail);
-                  setResult({ applied: r.applied, resolvedGaps: r.resolvedGaps, readinessBefore: r.readinessBefore, readinessAfter: r.readinessAfter, nextAction: r.nextAction });
-                })
-              }
+              onClick={async () => {
+                const r = await run({ op: "reply", text, inReplyTo });
+                if (!r.ok) {
+                  toast.error(r.detail);
+                  return;
+                }
+                toast.success(r.detail);
+                setResult({ applied: r.applied ?? [], resolvedGaps: r.resolvedGaps ?? [], readinessBefore: r.readinessBefore ?? null, readinessAfter: r.readinessAfter ?? null, nextAction: r.nextAction ?? null });
+                router.refresh();
+              }}
             >
               {pending ? "Processing…" : "Process reply"}
             </Button>

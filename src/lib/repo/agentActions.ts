@@ -65,6 +65,8 @@ export interface AgentTrace {
   result: string | null;
   /** The write tools this action actually invoked, in order. Empty until it executes. */
   tools_invoked?: string[];
+  /** MCP connectors (and their tool counts) that were configured and switched on when the agent decided. */
+  connectors_available?: string[];
 }
 
 export interface AgentActionMeta {

@@ -533,6 +533,7 @@ function AgentTracePanel({ action }: { action: AgentActionRow }) {
     ["Knowledge", t.knowledge.length ? t.knowledge.map((k) => k.title).join(" · ") : "No documents retrieved for this decision."],
     ["Decision", t.decision],
     ["Action", `${ACTION_LABEL[action.meta.action_type]}${action.meta.gap_label ? ` — ${action.meta.gap_label}` : ""}`],
+    ["Connectors", t.connectors_available?.length ? t.connectors_available.join(" · ") : "Not recorded on this action."],
     ["Result", t.result ?? "Not executed yet."],
     ...(action.meta.delivery ? ([["Delivery", `${DELIVERY_LABEL[action.meta.delivery.state]} — ${action.meta.delivery.detail}`]] as [string, React.ReactNode][]) : []),
   ];

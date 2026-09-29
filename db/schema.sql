@@ -162,3 +162,12 @@ alter table ai_deal_briefs add column if not exists intelligence jsonb not null 
 -- checks for these columns and works without them until this has been applied.
 alter table contacts add column if not exists source text;
 alter table contacts add column if not exists external_ref text;
+
+-- Small key/value store for application settings that are not per-lead and
+-- not secrets in the environment: connector enable/disable state, custom MCP
+-- servers a user added. Idempotent — safe to re-run `npm run db:schema`.
+create table if not exists app_settings (
+  key text primary key,
+  value jsonb not null default '{}'::jsonb,
+  updated_at timestamptz not null default now()
+);

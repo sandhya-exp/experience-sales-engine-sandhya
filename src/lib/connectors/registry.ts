@@ -3,7 +3,7 @@ import { emailProvider } from "@/lib/email/provider";
 import { getSetting, setSetting } from "@/lib/repo/settings";
 import { probeMcpServer } from "@/lib/connectors/mcpClient";
 import { CONNECT_SPECS, connectSpec, getConnection, type SavedConnection } from "@/lib/connectors/connect";
-import type { ConnectionInfo, ConnectorInfo, ConnectorStatus, ConnectorToolInfo, CustomServer, WorkflowNode } from "@/lib/connectors/types";
+import type { ConnectionInfo, ConnectorInfo, ConnectorLayer, ConnectorStatus, ConnectorToolInfo, CustomServer, WorkflowNode } from "@/lib/connectors/types";
 
 /**
  * The connector registry — one place that knows which external systems the
@@ -29,6 +29,7 @@ const envRow = (keys: string[]) => keys.map((key) => ({ key, present: env(key) }
 
 interface BuiltIn {
   key: string;
+  layer: ConnectorLayer;
   name: string;
   vendor: string;
   category: ConnectorInfo["category"];
@@ -51,6 +52,7 @@ const tool = (name: string, description: string, kind: ConnectorToolInfo["kind"]
 const BUILT_INS: BuiltIn[] = [
   {
     key: "sales_engine",
+    layer: "mcp",
     name: "Experience.com Sales Engine",
     vendor: "Experience.com",
     category: "internal",
@@ -69,6 +71,7 @@ const BUILT_INS: BuiltIn[] = [
   },
   {
     key: "email",
+    layer: "native",
     name: "Email / SMTP",
     vendor: "Resend",
     category: "email",
@@ -88,6 +91,7 @@ const BUILT_INS: BuiltIn[] = [
   },
   {
     key: "gmail",
+    layer: "native",
     name: "Gmail",
     vendor: "Google",
     category: "email",
@@ -104,6 +108,7 @@ const BUILT_INS: BuiltIn[] = [
   },
   {
     key: "google_calendar",
+    layer: "native",
     name: "Google Calendar",
     vendor: "Google",
     category: "calendar",
@@ -126,6 +131,7 @@ const BUILT_INS: BuiltIn[] = [
   },
   {
     key: "slack",
+    layer: "mcp",
     name: "Slack",
     vendor: "Slack",
     category: "messaging",
@@ -142,6 +148,7 @@ const BUILT_INS: BuiltIn[] = [
   },
   {
     key: "salesforce",
+    layer: "mcp",
     name: "Salesforce",
     vendor: "Salesforce",
     category: "crm",
@@ -158,6 +165,7 @@ const BUILT_INS: BuiltIn[] = [
   },
   {
     key: "hubspot",
+    layer: "mcp",
     name: "HubSpot",
     vendor: "HubSpot",
     category: "crm",
@@ -218,6 +226,7 @@ export async function listConnectors(): Promise<ConnectorInfo[]> {
       const connection: ConnectionInfo | undefined = status.state === "connected" ? (fromEnv || !savedConn ? { source: "env", account: null, verifiedAt: null } : { source: "saved", account: savedConn.account, verifiedAt: savedConn.verifiedAt }) : undefined;
       return {
         key: b.key,
+        layer: b.layer,
         name: b.name,
         vendor: b.vendor,
         category: b.category,
@@ -245,6 +254,7 @@ export async function listConnectors(): Promise<ConnectorInfo[]> {
     void ok;
     return {
       key: c.id,
+      layer: "mcp",
       name: c.name,
       vendor: c.serverName ?? "Custom MCP server",
       category: "custom",

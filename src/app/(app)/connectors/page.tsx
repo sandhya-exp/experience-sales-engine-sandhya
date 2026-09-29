@@ -1,5 +1,5 @@
 import { headers } from "next/headers";
-import { Plug, Sparkles, Workflow } from "lucide-react";
+import { Link2, Plug, Sparkles, Workflow } from "lucide-react";
 import { listConnectors, workflowNodes } from "@/lib/connectors/registry";
 import { settingsAvailable } from "@/lib/repo/settings";
 import { ConnectorCard } from "@/components/connectors/connector-card";
@@ -22,6 +22,8 @@ export default async function ConnectorsPage() {
   const [connectors, nodes, hasSettings] = await Promise.all([listConnectors(), workflowNodes(), settingsAvailable()]);
   const connected = connectors.filter((c) => c.status.state === "connected");
   const available = connectors.filter((c) => c.status.state !== "connected");
+  const native = connectors.filter((c) => c.layer === "native");
+  const mcp = connectors.filter((c) => c.layer === "mcp");
   const toolCount = connected.reduce((n, c) => n + c.tools.length, 0);
   const custom = connectors.filter((c) => c.custom);
 
@@ -29,10 +31,10 @@ export default async function ConnectorsPage() {
     <div className="mx-auto max-w-6xl px-6 pb-12 pt-8">
       <div className="mb-6">
         <div className="flex items-start justify-between gap-4">
-          <h1 className="text-[2rem] font-bold leading-tight tracking-tight text-foreground">Manage connectors</h1>
+          <h1 className="text-[2rem] font-bold leading-tight tracking-tight text-foreground">Integrations &amp; MCP</h1>
           <AddServerDialog selfUrl={selfUrl} hasSettings={hasSettings} />
         </div>
-        <p className="mt-1 max-w-4xl text-[15px] text-muted-foreground">MCP configuration for every system the Sales Engine can reach: authentication, server URL, tools and permissions, connection health, and which AI workflows use each one. Connected means the vendor confirmed the credentials; nothing here is simulated.</p>
+        <p className="mt-1 max-w-4xl text-[15px] text-muted-foreground">Native integrations are services the application talks to directly; MCP servers expose tools the AI agent calls through the standard tool interface. For each: authentication, server URL, tools and permissions, connection health, and which AI workflows use it. Connected means the vendor confirmed the credentials; nothing here is simulated.</p>
       </div>
 
       <div className="grid gap-3 sm:grid-cols-3">
@@ -43,20 +45,21 @@ export default async function ConnectorsPage() {
 
       <section className="mt-6">
         <h2 className="mb-2 flex items-center gap-2 text-[12px] font-semibold uppercase tracking-wide text-muted-foreground">
-          <Plug className="h-3.5 w-3.5" /> Connected
+          <Link2 className="h-3.5 w-3.5" /> Native integrations
         </h2>
         <ul className="space-y-2">
-          {connected.map((c) => (
+          {native.map((c) => (
             <ConnectorCard key={c.key} c={c} selfUrl={selfUrl} />
           ))}
-          {connected.length === 0 && <li className="rounded-[var(--radius)] border border-dashed border-border px-4 py-8 text-center text-[13px] text-muted-foreground">Nothing is connected yet.</li>}
         </ul>
       </section>
 
       <section className="mt-6">
-        <h2 className="mb-2 text-[12px] font-semibold uppercase tracking-wide text-muted-foreground">Available</h2>
+        <h2 className="mb-2 flex items-center gap-2 text-[12px] font-semibold uppercase tracking-wide text-muted-foreground">
+          <Plug className="h-3.5 w-3.5" /> MCP servers
+        </h2>
         <ul className="space-y-2">
-          {available.map((c) => (
+          {mcp.map((c) => (
             <ConnectorCard key={c.key} c={c} selfUrl={selfUrl} />
           ))}
         </ul>

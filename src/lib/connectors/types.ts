@@ -24,8 +24,16 @@ export interface ConnectorStatus {
   checkedAt?: string | null;
 }
 
+/**
+ * native — the application integrates with the service directly (its own API
+ * client); mcp — an MCP server exposes tools the AI agent calls through the
+ * standard tool interface. Same registry, different shelf.
+ */
+export type ConnectorLayer = "native" | "mcp";
+
 export interface ConnectorInfo {
   key: string;
+  layer: ConnectorLayer;
   name: string;
   vendor: string;
   category: ConnectorCategory;

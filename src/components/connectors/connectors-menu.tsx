@@ -21,8 +21,9 @@ const ICON: Record<ConnectorInfo["category"], React.ComponentType<{ className?: 
 };
 
 /**
- * The plug menu in the top bar: the quick connector switcher. Status at a
- * glance, connect an unconnected one in place, switch a connected one off.
+ * The plug menu in the top bar: the quick switcher. Two shelves — the
+ * application's native integrations, and the MCP servers whose tools the
+ * AI agent calls — with status at a glance, connect in place, on/off.
  * Everything deeper — authentication, server URL, tools and permissions,
  * health, which workflows use it, disconnect/delete — lives on Manage
  * connectors (/connectors).
@@ -42,8 +43,9 @@ export function ConnectorsMenu() {
     }
   }, []);
 
-  const connected = snap?.connectors.filter((c) => c.status.state === "connected" || c.status.state === "disabled" || c.status.state === "demo") ?? [];
-  const notConnected = snap?.connectors.filter((c) => !connected.includes(c)) ?? [];
+  const isConnected = (c: ConnectorInfo) => c.status.state === "connected" || c.status.state === "disabled" || c.status.state === "demo";
+  const native = snap?.connectors.filter((c) => c.layer === "native") ?? [];
+  const mcp = snap?.connectors.filter((c) => c.layer === "mcp") ?? [];
   const connectTarget = snap?.connectors.find((c) => c.key === connectKey) ?? null;
 
   return (
@@ -56,50 +58,42 @@ export function ConnectorsMenu() {
         <DropdownMenuTrigger asChild>
           <button
             type="button"
-            title="MCP & Integrations"
-            aria-label="MCP & Integrations"
+            title="Integrations & MCP"
+            aria-label="Integrations & MCP"
             className="flex h-9 w-9 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-ring/30 data-[state=open]:bg-muted data-[state=open]:text-foreground"
           >
             <Plug className="h-[18px] w-[18px]" />
           </button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" className="w-[340px] p-1.5">
-          <DropdownMenuLabel className="flex items-center gap-2 px-2.5 py-1.5 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-            <Plug className="h-3.5 w-3.5" /> MCP &amp; Integrations
-          </DropdownMenuLabel>
-          <DropdownMenuItem onSelect={() => setAddOpen(true)} className="gap-2.5 px-2.5 py-2 text-[13.5px]">
-            <Plus className="h-4 w-4 text-muted-foreground" /> Add custom MCP server
-          </DropdownMenuItem>
-          <DropdownMenuItem asChild className="gap-2.5 px-2.5 py-2 text-[13.5px]">
-            <Link href="/connectors">
-              <SlidersHorizontal className="h-4 w-4 text-muted-foreground" /> Manage connectors
-            </Link>
-          </DropdownMenuItem>
-          <DropdownMenuSeparator />
           {!snap && (
             <div className="space-y-1.5 p-1.5">
-              {[0, 1, 2, 3].map((i) => (
+              {[0, 1, 2, 3, 4].map((i) => (
                 <div key={i} className="h-8 animate-pulse rounded-md bg-muted/60" />
               ))}
             </div>
           )}
           {snap && (
-            <div className={cn("max-h-[60vh] overflow-y-auto", loading && "opacity-60")}>
+            <div className={cn("max-h-[70vh] overflow-y-auto", loading && "opacity-60")}>
+              <DropdownMenuLabel className="px-2.5 py-1.5 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Integrations</DropdownMenuLabel>
               <ul>
-                {connected.map((c) => (
-                  <ConnectedRow key={c.key} c={c} onChanged={load} />
-                ))}
+                {native.map((c) => (isConnected(c) ? <ConnectedRow key={c.key} c={c} onChanged={load} /> : <NotConnectedRow key={c.key} c={c} onPick={() => setConnectKey(c.key)} />))}
               </ul>
-              {notConnected.length > 0 && (
-                <>
-                  <DropdownMenuSeparator />
-                  <ul>
-                    {notConnected.map((c) => (
-                      <NotConnectedRow key={c.key} c={c} onPick={() => setConnectKey(c.key)} />
-                    ))}
-                  </ul>
-                </>
-              )}
+              <DropdownMenuSeparator />
+              <DropdownMenuLabel className="flex items-center gap-2 px-2.5 py-1.5 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                <Plug className="h-3.5 w-3.5" /> MCP
+              </DropdownMenuLabel>
+              <DropdownMenuItem onSelect={() => setAddOpen(true)} className="gap-2.5 px-2.5 py-2 text-[13.5px]">
+                <Plus className="h-4 w-4 text-muted-foreground" /> Add MCP server
+              </DropdownMenuItem>
+              <DropdownMenuItem asChild className="gap-2.5 px-2.5 py-2 text-[13.5px]">
+                <Link href="/connectors">
+                  <SlidersHorizontal className="h-4 w-4 text-muted-foreground" /> Manage MCP servers
+                </Link>
+              </DropdownMenuItem>
+              <ul>
+                {mcp.map((c) => (isConnected(c) ? <ConnectedRow key={c.key} c={c} onChanged={load} /> : <NotConnectedRow key={c.key} c={c} onPick={() => setConnectKey(c.key)} />))}
+              </ul>
             </div>
           )}
         </DropdownMenuContent>

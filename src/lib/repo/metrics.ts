@@ -39,6 +39,13 @@ export interface FunnelStep {
   cumulativeConversion: number;
 }
 
+export interface Breakdown {
+  label: string;
+  count: number;
+  /** Accepted-quote value behind the count, where money applies. */
+  value: number;
+}
+
 export interface SalesMetrics {
   /** Oldest first, always twelve entries so the chart has a stable shape. */
   months: MonthPoint[];
@@ -61,6 +68,10 @@ export interface SalesMetrics {
   /** Open opportunities right now, whatever the window. */
   openCount: number;
   funnel: FunnelStep[];
+  /** Why deals were lost in the window, most common first. Unreasoned losses count as "Not recorded". */
+  lostByReason: Breakdown[];
+  /** Where won deals came from — the customer's "how did you hear about us", else the channel. */
+  wonBySource: Breakdown[];
   /** True when there is nothing to draw, so panels can say so instead of rendering an empty axis. */
   empty: boolean;
 }
@@ -85,13 +96,19 @@ export {
 } from "@/lib/reports/ranges";
 
 export async function salesMetrics(window: Window = trailingYearWindow()): Promise<SalesMetrics> {
-  const [leads, stageMoves, quoteRows] = await Promise.all([
+  const [leads, stageMoves, quoteRows, originRows] = await Promise.all([
     query<{ id: string; status: LeadStatus; created_at: unknown }>(`select id, status, created_at from leads`),
-    query<{ lead_id: string; to_status: string | null; body: string; occurred_at: unknown }>(
-      `select lead_id, metadata->>'to' as to_status, coalesce(body, '') as body, occurred_at
+    query<{ lead_id: string; to_status: string | null; reason: string | null; body: string; occurred_at: unknown }>(
+      `select lead_id, metadata->>'to' as to_status, metadata->>'reason' as reason, coalesce(body, '') as body, occurred_at
          from activities where type = 'status_change'`
     ),
     query<{ lead_id: string; metadata: unknown }>(`select lead_id, metadata from activities where metadata->>'kind' = 'quote'`),
+    // Where each lead came from: the structured "lead created" note, or the
+    // sentence on older rows ("Lead created from Talk to Sales form.").
+    query<{ lead_id: string; heard_from: string | null; channel: string | null; body: string }>(
+      `select lead_id, metadata->>'heard_from' as heard_from, metadata->>'channel' as channel, coalesce(body, '') as body
+         from activities where type = 'note' and (metadata->>'kind' = 'lead_created' or body like 'Lead created from %')`
+    ),
   ]);
 
   const inWindow = (d: Date) => d >= window.from && d <= window.to;
@@ -100,14 +117,25 @@ export async function salesMetrics(window: Window = trailingYearWindow()): Promi
   // Stage changes written before the structured metadata existed only carry the
   // sentence, so read that as a fallback rather than under-counting the past.
   const reachedAt = new Map<string, Partial<Record<LeadStatus, Date>>>();
+  const lostReason = new Map<string, string>();
   for (const move of stageMoves) {
     const to = (move.to_status ?? legacyTarget(move.body)) as LeadStatus | null;
     if (!to || !LEAD_STATUSES.includes(to)) continue;
+    if (to === "lost" && move.reason) lostReason.set(move.lead_id, move.reason);
     const when = asDate(move.occurred_at);
     const forLead = reachedAt.get(move.lead_id) ?? {};
     const existing = forLead[to];
     if (!existing || when < existing) forLead[to] = when;
     reachedAt.set(move.lead_id, forLead);
+  }
+
+  /* ---- origin ------------------------------------------------------------ */
+  const sourceOf = new Map<string, string>();
+  for (const row of originRows) {
+    if (sourceOf.has(row.lead_id)) continue;
+    const channel = row.channel ?? /^Lead created from (.+?)\.(\s|$)/.exec(row.body)?.[1] ?? null;
+    const label = row.heard_from ?? channel;
+    if (label) sourceOf.set(row.lead_id, label);
   }
 
   /* ---- quotes ------------------------------------------------------------ */
@@ -145,6 +173,14 @@ export async function salesMetrics(window: Window = trailingYearWindow()): Promi
   const dealSizes: number[] = [];
   const reachedCounts = new Map<LeadStatus, number>();
   let inquiriesInWindow = 0;
+  const lostBuckets = new Map<string, Breakdown>();
+  const sourceBuckets = new Map<string, Breakdown>();
+  const bump = (map: Map<string, Breakdown>, label: string, value: number) => {
+    const b = map.get(label) ?? { label, count: 0, value: 0 };
+    b.count += 1;
+    b.value += value;
+    map.set(label, b);
+  };
 
   for (const lead of leads) {
     const createdAt = asDate(lead.created_at);
@@ -183,6 +219,7 @@ export async function salesMetrics(window: Window = trailingYearWindow()): Promi
         wonCount += 1;
         const value = quote?.total ?? 0;
         revenueClosed += value;
+        bump(sourceBuckets, sourceOf.get(lead.id) ?? "Not recorded", value);
         if (value > 0) dealSizes.push(value);
         cycles.push(Math.max(0, Math.round((wonAt.getTime() - createdAt.getTime()) / 86_400_000)));
         const i = monthIndex.get(monthKey(wonAt));
@@ -193,7 +230,10 @@ export async function salesMetrics(window: Window = trailingYearWindow()): Promi
       }
     } else if (lead.status === "lost") {
       const lostAt = history.lost ?? createdAt;
-      if (inWindow(lostAt)) lostCount += 1;
+      if (inWindow(lostAt)) {
+        lostCount += 1;
+        bump(lostBuckets, lostReason.get(lead.id) ?? "Not recorded", quote?.total ?? 0);
+      }
     }
   }
 
@@ -223,6 +263,8 @@ export async function salesMetrics(window: Window = trailingYearWindow()): Promi
     quotesAccepted,
     openCount,
     funnel,
+    lostByReason: [...lostBuckets.values()].map((b) => ({ ...b, value: round(b.value) })).sort((a, b) => b.count - a.count || a.label.localeCompare(b.label)),
+    wonBySource: [...sourceBuckets.values()].map((b) => ({ ...b, value: round(b.value) })).sort((a, b) => b.value - a.value || b.count - a.count),
     empty: wonCount === 0 && lostCount === 0 && quotesSent === 0,
   };
 }

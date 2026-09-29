@@ -1,9 +1,11 @@
 import Link from "next/link";
-import { AlertTriangle, Clock } from "lucide-react";
+import { AlertTriangle, CalendarClock, Clock } from "lucide-react";
+import { format } from "date-fns";
 import { LEAD_STATUSES, LEAD_STATUS_LABELS, type LeadListRow, type LeadStatus } from "@/lib/types";
-import { needsAttention } from "@/lib/dashboard";
+import { needsAttention, hasUpcomingFollowUp } from "@/lib/dashboard";
 import { formatMoney } from "@/lib/repo/quotes";
 import { daysSince } from "@/lib/format";
+import { estimateDealValue } from "@/lib/dealSignals";
 import { cn } from "@/lib/utils";
 
 /**
@@ -23,7 +25,14 @@ import { cn } from "@/lib/utils";
 export function PipelineBoard({ rows, valueByLead, focus }: { rows: LeadListRow[]; valueByLead: Map<string, number>; focus?: LeadStatus | null }) {
   const columns = (focus ? [focus] : LEAD_STATUSES).map((status) => {
     const cards = rows.filter((r) => r.status === status);
-    return { status, cards, total: cards.reduce((s, c) => s + (valueByLead.get(c.id) ?? 0), 0) };
+    let total = 0;
+    let estimated = 0;
+    for (const c of cards) {
+      const quoted = valueByLead.get(c.id) ?? 0;
+      if (quoted > 0) total += quoted;
+      else if (status !== "won" && status !== "lost") estimated += estimateDealValue(c)?.amount ?? 0;
+    }
+    return { status, cards, total, estimated };
   });
 
   // Filtering to one stage should show that stage, not one populated column
@@ -37,7 +46,8 @@ export function PipelineBoard({ rows, valueByLead, focus }: { rows: LeadListRow[
           <h3 className="text-[12px] font-semibold uppercase tracking-wide text-muted-foreground">{LEAD_STATUS_LABELS[col.status]}</h3>
           <p className="text-[12.5px] tabular-nums text-muted-foreground">
             {col.cards.length} {col.cards.length === 1 ? "opportunity" : "opportunities"}
-            {col.total > 0 ? ` · ${formatMoney(col.total)}` : ""}
+            {col.total > 0 ? ` · ${formatMoney(col.total)} quoted` : ""}
+            {col.estimated > 0 ? ` · ~${formatMoney(col.estimated)} est.` : ""}
           </p>
         </div>
         {col.cards.length === 0 ? (
@@ -68,7 +78,11 @@ export function PipelineBoard({ rows, valueByLead, focus }: { rows: LeadListRow[
                 <h3 className="truncate text-[12px] font-semibold uppercase tracking-wide text-muted-foreground">{LEAD_STATUS_LABELS[col.status]}</h3>
                 <span className="text-[13px] font-semibold tabular-nums text-foreground">{col.cards.length}</span>
               </div>
-              <p className="mt-0.5 text-[11px] tabular-nums text-muted-foreground">{col.total > 0 ? formatMoney(col.total) : "No quoted value"}</p>
+              <p className="mt-0.5 truncate text-[11px] tabular-nums text-muted-foreground" title={col.estimated > 0 ? "Estimates are users × list price of the product the inquiry points to — not quotes." : undefined}>
+                {col.total > 0 ? `${formatMoney(col.total)} quoted` : col.estimated > 0 ? "" : "No quoted value"}
+                {col.total > 0 && col.estimated > 0 ? " · " : ""}
+                {col.estimated > 0 ? `~${formatMoney(col.estimated)} est.` : ""}
+              </p>
             </header>
 
             <div className="min-h-[88px] flex-1 space-y-2 overflow-y-auto p-2">
@@ -88,6 +102,8 @@ export function PipelineBoard({ rows, valueByLead, focus }: { rows: LeadListRow[
 function BoardCard({ lead, value }: { lead: LeadListRow; value: number }) {
   const attention = needsAttention(lead);
   const days = daysSince(lead.last_activity_at ?? lead.created_at);
+  const estimate = value > 0 || lead.status === "won" || lead.status === "lost" ? null : estimateDealValue(lead);
+  const upcoming = hasUpcomingFollowUp(lead) && lead.follow_up_at ? new Date(lead.follow_up_at) : null;
   const initials = (lead.owner_name ?? "")
     .split(" ")
     .map((p) => p[0])
@@ -108,7 +124,25 @@ function BoardCard({ lead, value }: { lead: LeadListRow; value: number }) {
         {lead.number_of_users ? ` · ${lead.number_of_users} users` : ""}
       </p>
 
-      <p className="mt-1.5 text-[13px] font-semibold tabular-nums text-foreground">{value > 0 ? formatMoney(value) : <span className="font-normal text-muted-foreground">Not quoted</span>}</p>
+      <p className="mt-1.5 text-[13px] font-semibold tabular-nums text-foreground">
+        {value > 0 ? (
+          formatMoney(value)
+        ) : estimate ? (
+          <span className="font-medium text-muted-foreground" title={`Estimate: ${estimate.basis}. Not a quote.`}>
+            ~{formatMoney(estimate.amount)} <span className="text-[10.5px] font-normal uppercase tracking-wide">est.</span>
+          </span>
+        ) : (
+          <span className="font-normal text-muted-foreground">Not quoted</span>
+        )}
+      </p>
+      {upcoming && (
+        <p className="mt-1 flex items-center gap-1 truncate text-[11.5px] text-primary">
+          <CalendarClock className="h-3 w-3 shrink-0" />
+          <span className="truncate">
+            {lead.follow_up_title ?? "Follow-up"} · {format(upcoming, "EEE d MMM, h:mm a")}
+          </span>
+        </p>
+      )}
 
       <div className="mt-2 flex items-center justify-between gap-2 border-t border-border pt-2">
         <span className={cn("inline-flex min-w-0 items-center gap-1 text-[11px]", attention.flagged ? "text-warning" : "text-muted-foreground")}>

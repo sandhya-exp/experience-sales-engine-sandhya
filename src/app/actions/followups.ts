@@ -7,18 +7,15 @@ import { scheduleFollowUp, completeFollowUp } from "@/lib/repo/followups";
 import { bookDiscoveryCall } from "@/lib/calendar/booking";
 import { isMeetingDuration } from "@/lib/calendar/recommend";
 import { isConferenceKey } from "@/lib/calendar/conferencing";
-import { refreshOpportunity } from "@/lib/ai/agent";
+import { scheduleRefresh } from "@/lib/ai/background";
 
 /**
  * A booking changes what the agent should do — a call two days out turns the
- * next action into preparing for it — so the same refresh runs here.
+ * next action into preparing for it — so the same refresh runs here, after
+ * the response: the booking is confirmed at once, the brief follows.
  */
 async function refreshBrief(leadId: string) {
-  try {
-    await refreshOpportunity(leadId);
-  } catch (err) {
-    console.error("Brief refresh after follow-up change failed (non-fatal):", err);
-  }
+  await scheduleRefresh(leadId, {}, ["/", "/pipeline", "/activity"]);
 }
 
 function revalidateLead(leadId: string) {

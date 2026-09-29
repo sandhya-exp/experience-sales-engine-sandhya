@@ -4,6 +4,7 @@ import { listContactsForCompany } from "@/lib/repo/contacts";
 import { listActivitiesForLead } from "@/lib/repo/activities";
 import { saveBrief } from "@/lib/repo/aiBriefs";
 import { generateDealBrief, type DealBriefContext } from "@/lib/ai/dealBrief";
+import type { RunOptions } from "@/lib/ai/orchestrator";
 import type { OpportunityDataSource } from "@/lib/ai/tools";
 import type { Company } from "@/lib/types";
 
@@ -32,8 +33,8 @@ export const dbSource: OpportunityDataSource = {
  * Regenerate and persist the brief for one lead. The only write in the AI
  * path — and it writes the brief, never the opportunity.
  */
-export async function regenerateBriefFor(ctx: DealBriefContext) {
-  const generated = await generateDealBrief(ctx, dbSource);
+export async function regenerateBriefFor(ctx: DealBriefContext, opts: Pick<RunOptions, "now" | "onStage"> = {}) {
+  const generated = await generateDealBrief(ctx, dbSource, opts);
   return saveBrief(
     ctx.lead.id,
     {

@@ -9,6 +9,7 @@ import { extractCallRecap, planCallRecapApplication } from "@/lib/ai/callRecap";
 import { recordCallRecap, patchCallRecap, getCallRecap, type CallRecapMeta } from "@/lib/repo/callRecap";
 import { applyCustomerFacts, primaryContact } from "@/lib/ai/actions";
 import { refreshOpportunity } from "@/lib/ai/agent";
+import { scheduleRefresh } from "@/lib/ai/background";
 import type { Qualification } from "@/lib/types";
 
 function revalidateLead(leadId: string) {
@@ -125,11 +126,7 @@ export async function confirmCallRecapFactsAction(leadId: string, activityId: st
     confirmed_by: user.name,
   });
 
-  try {
-    await refreshOpportunity(leadId);
-  } catch (err) {
-    console.error("Brief refresh after call recap confirmation failed (non-fatal):", err);
-  }
+  await scheduleRefresh(leadId, {}, ["/", "/pipeline"]);
 
   revalidateLead(leadId);
   return { ok: true, detail: plan.applied.length ? `Applied: ${plan.applied.join(", ")}.` : "Nothing new to apply — the record already had this." };

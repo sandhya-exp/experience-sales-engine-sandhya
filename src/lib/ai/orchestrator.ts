@@ -3,6 +3,7 @@ import { computeReadiness } from "@/lib/readiness";
 import { DOWNSTREAM } from "@/lib/modules";
 import { buildIntelligence, integrationKind, mentionsIntegration, type AiProcess, type ChainStep, type Contradiction, type EvidenceItem, type GuidedSellingReadiness, type OpportunityIntelligence, type ProductContext, type StageRun } from "@/lib/ai/intelligence";
 import { callClaudeJson, claudeAvailable, claudeModel } from "@/lib/ai/claude";
+import type { AiProgressStage } from "@/lib/ai/progress";
 import { makeTools, ToolTrace, type OpportunityDataSource, type QualificationView } from "@/lib/ai/tools";
 import { getKnowledgeDoc } from "@/lib/ai/knowledge/index";
 import type { RetrievedDoc } from "@/lib/ai/knowledge/retrieval";
@@ -31,6 +32,8 @@ export interface RunOptions {
   /** Force deterministic mode (evals, demos without a key). */
   mode?: "auto" | "deterministic";
   now?: Date;
+  /** Progress reporting for a UI that is waiting on this run. Never affects the result. */
+  onStage?: (stage: AiProgressStage) => void;
 }
 
 export interface IntelligenceRun {
@@ -45,8 +48,16 @@ export async function runOpportunityIntelligence(leadId: string, source: Opportu
   const useClaude = opts.mode !== "deterministic" && claudeAvailable();
   const stages: StageRun[] = [];
   const tokens = { input: 0, output: 0 };
+  const report = (stage: AiProgressStage) => {
+    try {
+      opts.onStage?.(stage);
+    } catch {
+      /* progress is best-effort */
+    }
+  };
 
   // ---- Tools: read the record ------------------------------------------------
+  report("read");
   const record = await tools.getOpportunity(leadId);
   if (!record) throw new Error("Opportunity not found");
   const { lead, company } = record;
@@ -61,6 +72,7 @@ export async function runOpportunityIntelligence(leadId: string, source: Opportu
   const recordContradictions = detectContradictions(lead, contacts);
 
   // ---- Retrieval -------------------------------------------------------------
+  report("retrieve");
   const tRetrieve = Date.now();
   const capabilityQuery = [lead.interest, base.quote_context.primary_need, company.industry, ...base.quote_context.integrations, lead.requirements, lead.additional_info]
     .filter(Boolean)
@@ -87,6 +99,7 @@ export async function runOpportunityIntelligence(leadId: string, source: Opportu
   });
 
   // ---- Stage 1: Opportunity Analyst ------------------------------------------
+  report("analyze");
   let analyst = deterministicAnalyst({ lead, company, contacts, activities, base, facts });
   let analystStage: StageRun = { key: "analyst", label: "Opportunity Analyst", mode: "deterministic", duration_ms: 0, summary: "" };
   if (useClaude) {
@@ -142,6 +155,7 @@ export async function runOpportunityIntelligence(leadId: string, source: Opportu
   }
 
   // ---- Stage 3: Readiness / Evaluator ----------------------------------------
+  report("readiness");
   const tEval = Date.now();
   const evaluation = deterministicEvaluate({ analyst, solution, facts, retrieved, qualification, base });
   let evaluatorStage: StageRun = { key: "evaluator", label: "Readiness / Evaluator", mode: "deterministic", duration_ms: 0, summary: "" };

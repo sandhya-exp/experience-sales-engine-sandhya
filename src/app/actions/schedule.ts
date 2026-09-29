@@ -12,7 +12,7 @@ import { schedulingConfig } from "@/lib/calendar/config";
 import { getCalendarProvider, verifySlot } from "@/lib/calendar/index";
 import { isMeetingDuration } from "@/lib/calendar/recommend";
 import { CONFERENCING, CONFERENCE_LABEL, type ConferenceKey } from "@/lib/calendar/conferencing";
-import { refreshOpportunity } from "@/lib/ai/agent";
+import { scheduleRefresh } from "@/lib/ai/background";
 import { formatInZone } from "@/lib/calendar/time";
 import type { Company } from "@/lib/types";
 
@@ -149,13 +149,9 @@ export async function createScheduleAction(formData: FormData): Promise<Schedule
     calendar,
   });
 
-  // A booked call changes what the agent should do next, so the loop re-runs
-  // and the preparation brief is written before anyone opens the opportunity.
-  try {
-    await refreshOpportunity(lead.id);
-  } catch (err) {
-    console.error("Brief refresh after scheduling failed (non-fatal):", err);
-  }
+  // A booked call changes what the agent should do next, so the loop re-runs —
+  // after the confirmation is on its way, not before.
+  await scheduleRefresh(lead.id, {}, ["/", "/schedule", "/tasks"]);
 
   revalidatePath("/schedule");
   revalidatePath("/tasks");

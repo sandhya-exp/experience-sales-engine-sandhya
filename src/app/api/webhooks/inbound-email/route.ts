@@ -6,7 +6,7 @@ import { hasIntelligence } from "@/lib/ai/briefGuards";
 import { extractFromReply } from "@/lib/ai/reply";
 import { recordInboundReply, type InboundReplyMeta } from "@/lib/repo/inboundReply";
 import { primaryContact } from "@/lib/ai/actions";
-import { refreshOpportunity } from "@/lib/ai/agent";
+import { scheduleRefresh } from "@/lib/ai/background";
 import { revalidatePath } from "next/cache";
 
 /**
@@ -106,11 +106,7 @@ export async function POST(req: Request) {
   // and the agent's next recommended action reflects that the customer wrote
   // back — non-fatal: a slow or failed refresh should never make the capture
   // itself fail.
-  try {
-    await refreshOpportunity(match.leadId);
-  } catch (err) {
-    console.error("Brief refresh after inbound email capture failed (non-fatal):", err);
-  }
+  await scheduleRefresh(match.leadId, {}, ["/", "/pipeline"]);
 
   revalidatePath(`/leads/${match.leadId}`);
   revalidatePath("/");

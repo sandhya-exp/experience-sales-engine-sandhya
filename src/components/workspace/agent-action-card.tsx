@@ -119,7 +119,7 @@ export function AgentActionCard({
             </Field>
           </dl>
 
-          {meta.evidence.length > 0 && (
+          {meta.evidence.length > 0 && !executed && (
             <div className="mt-3">
               <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Evidence</p>
               <ul className="mt-1.5 space-y-1">
@@ -148,24 +148,14 @@ export function AgentActionCard({
         {/* The proposed email, as its own card — separated from the reasoning
             above rather than nested inside it, so each reads as a distinct
             block: why this, then here's the actual message. */}
-        {meta.draft_message && <ProposedEmailBlock leadId={leadId} action={action} providerLabel={providerLabel} />}
+        {meta.draft_message && !executed && <ProposedEmailBlock leadId={leadId} action={action} providerLabel={providerLabel} />}
 
-        {executed && (
-          <div className="rounded-lg border border-success/30 bg-success/5 px-3 py-2.5">
-            <p className="flex items-center gap-2 text-[13px] font-medium text-foreground">
-              <CheckCircle2 className="h-4 w-4 text-success" />
-              {meta.trace.result ?? "Done."}
-            </p>
-            {meta.executed_at && <p className="mt-0.5 pl-6 text-[12px] text-muted-foreground">{new Date(meta.executed_at).toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}{meta.auto ? " · executed automatically" : ""}</p>}
-            {waiting && (
-              <p className="mt-1.5 flex items-center gap-1.5 pl-6 text-[12px] text-muted-foreground">
-                <Clock className="h-3.5 w-3.5" /> Waiting for the customer to reply.
-              </p>
-            )}
-          </div>
-        )}
+        {/* Once the action has run, the story compresses to one line per step:
+            sent → waiting → reply. The email body, the provider's delivery
+            detail and the tool calls all live in the trace below. */}
+        {executed && <DoneStrip action={action} />}
 
-        {waiting && <ReplyBox leadId={leadId} inReplyTo={action.activityId} />}
+        {waiting && <WaitingForReply leadId={leadId} inReplyTo={action.activityId} />}
 
         {lastReply && <CustomerResponsePanel reply={lastReply} />}
 
@@ -292,10 +282,76 @@ function ProposedEmailBlock({ leadId, action, providerLabel }: { leadId: string;
   );
 }
 
+/* -------------------------------------------------------------------- done */
+
+/**
+ * The executed action in one line: what went out, to whom, when — with the
+ * email body one click away. Provider mechanics ("set EMAIL_PROVIDER=…") are
+ * deliberately not here; they are in the trace for whoever needs them.
+ */
+function DoneStrip({ action }: { action: AgentActionRow }) {
+  const { meta } = action;
+  const draft = meta.draft_message;
+  const [open, setOpen] = useState(false);
+  const when = meta.executed_at ? new Date(meta.executed_at).toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }) : null;
+  const delivery = meta.delivery?.state;
+  const verb = draft ? (delivery === "sent" ? "Email sent" : delivery === "failed" ? "Email failed" : "Email approved") : "Done";
+
+  return (
+    <div className={cn("rounded-lg border px-3 py-2.5", delivery === "failed" ? "border-destructive/30 bg-destructive/5" : "border-success/30 bg-success/5")}>
+      <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+        <CheckCircle2 className={cn("h-4 w-4 shrink-0", delivery === "failed" ? "text-destructive" : "text-success")} />
+        <p className="text-[13px] font-medium text-foreground">
+          {verb}
+          {draft ? <span className="font-normal text-muted-foreground"> to {draft.to.name ?? draft.to.email}</span> : null}
+        </p>
+        {when && <span className="text-[12px] text-muted-foreground">· {when}{meta.auto ? " · automatic" : ""}</span>}
+        {meta.delivery && <DeliveryBadge state={meta.delivery.state} />}
+        {draft && (
+          <Button size="sm" variant="ghost" className="ml-auto h-6 px-2 text-[11px]" onClick={() => setOpen((o) => !o)}>
+            {open ? "Hide email" : "View email"}
+          </Button>
+        )}
+      </div>
+      {draft && open && (
+        <div className="mt-2 rounded-md border border-border bg-card px-3 py-2">
+          <p className="text-[13px] font-semibold text-foreground">{draft.subject}</p>
+          <p className="text-[11.5px] text-muted-foreground">To {draft.to.name ?? draft.to.email} · {draft.to.email}</p>
+          <p className="mt-2 whitespace-pre-wrap text-[13px] leading-relaxed text-foreground">{draft.body}</p>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/**
+ * The wait state, kept small on purpose. The reply normally arrives on its
+ * own through the inbound-email webhook; pasting one by hand is the fallback
+ * (and the demo path), so it is a link, not an open form.
+ */
+function WaitingForReply({ leadId, inReplyTo }: { leadId: string; inReplyTo: string }) {
+  const [manual, setManual] = useState(false);
+  return (
+    <div className="rounded-lg border border-dashed border-border px-3 py-2.5">
+      <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+        <Clock className="h-4 w-4 shrink-0 text-navy" />
+        <p className="text-[13px] font-medium text-foreground">Waiting for the customer to reply</p>
+        <span className="text-[12px] text-muted-foreground">· the reply is captured and analyzed automatically when it arrives</span>
+        {!manual && (
+          <Button size="sm" variant="ghost" className="ml-auto h-6 px-2 text-[11px]" onClick={() => setManual(true)}>
+            Paste a reply manually
+          </Button>
+        )}
+      </div>
+      {manual && <ReplyBox leadId={leadId} inReplyTo={inReplyTo} startOpen onClose={() => setManual(false)} />}
+    </div>
+  );
+}
+
 /* ------------------------------------------------------------------- reply */
 
-function ReplyBox({ leadId, inReplyTo }: { leadId: string; inReplyTo: string }) {
-  const [open, setOpen] = useState(false);
+function ReplyBox({ leadId, inReplyTo, startOpen = false, onClose }: { leadId: string; inReplyTo: string; startOpen?: boolean; onClose?: () => void }) {
+  const [open, setOpen] = useState(startOpen);
   const [text, setText] = useState("");
   const [pending, startTransition] = useTransition();
   const [result, setResult] = useState<{ applied: string[]; resolvedGaps: string[]; readinessBefore: string | null; readinessAfter: string | null; nextAction: string | null } | null>(null);
@@ -364,7 +420,7 @@ function ReplyBox({ leadId, inReplyTo }: { leadId: string; inReplyTo: string }) 
             >
               {pending ? "Processing…" : "Process reply"}
             </Button>
-            <Button size="sm" variant="ghost" onClick={() => setOpen(false)}>
+            <Button size="sm" variant="ghost" onClick={() => { setOpen(false); onClose?.(); }}>
               Cancel
             </Button>
           </div>
@@ -386,18 +442,28 @@ function ReplyBox({ leadId, inReplyTo }: { leadId: string; inReplyTo: string }) 
 function CustomerResponsePanel({ reply }: { reply: { occurredAt: string; meta: CustomerReplyMeta } }) {
   const { meta } = reply;
   const t = meta.transition;
+  const facts = meta.extracted.length;
+  const gaps = t?.resolved_gaps?.length ?? 0;
+  const summary = [
+    `${facts} fact${facts === 1 ? "" : "s"} found`,
+    gaps ? `${gaps} question${gaps === 1 ? "" : "s"} answered` : null,
+    t?.readiness_before && t?.readiness_after && t.readiness_before !== t.readiness_after ? `readiness ${t.readiness_before} → ${t.readiness_after}` : null,
+  ]
+    .filter(Boolean)
+    .join(" · ");
   return (
-    <div className="mt-3 rounded-lg border border-border bg-card">
-      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border px-3 py-2">
-        <p className="section-label flex items-center gap-1.5 text-navy">
-          <Mail className="h-3.5 w-3.5" /> Customer response
-        </p>
-        <span className="text-[11px] text-muted-foreground">
-          {new Date(reply.occurredAt).toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })} ·{" "}
-          {meta.generated_by === "claude" ? `read by Claude${meta.model ? ` · ${meta.model.replace(/^claude-/, "")}` : ""}` : "read deterministically"}
+    <details className="group mt-3 rounded-lg border border-navy/25 bg-card">
+      <summary className="flex cursor-pointer list-none flex-wrap items-center gap-x-2 gap-y-1 px-3 py-2.5 [&::-webkit-details-marker]:hidden">
+        <Sparkles className="h-4 w-4 shrink-0 text-navy" />
+        <span className="text-[13px] font-medium text-foreground">Customer replied</span>
+        <span className="text-[12px] text-muted-foreground">· {summary}</span>
+        <span className="ml-auto text-[11px] text-muted-foreground">
+          {new Date(reply.occurredAt).toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}
         </span>
-      </div>
-      <p className="border-b border-border px-3 py-2 text-[13px] italic leading-snug text-foreground">&ldquo;{meta.text}&rdquo;</p>
+        <span className="text-[12px] font-medium text-navy group-open:hidden">Review findings</span>
+        <span className="hidden text-[12px] font-medium text-navy group-open:inline">Hide</span>
+      </summary>
+      <p className="border-y border-border px-3 py-2 text-[13px] italic leading-snug text-foreground">&ldquo;{meta.text}&rdquo;</p>
       <ul className="space-y-1 px-3 py-2.5 text-[13px]">
         {meta.extracted.length > 0 ? (
           meta.extracted.map((e, i) => (
@@ -432,8 +498,11 @@ function CustomerResponsePanel({ reply }: { reply: { occurredAt: string; meta: C
             <Sparkles className="mt-0.5 h-3.5 w-3.5 shrink-0 text-navy" /> New next action: <span className="font-medium">{t.next_action_after}</span>
           </li>
         )}
+        <li className="pt-1 text-[11px] text-muted-foreground">
+          {meta.generated_by === "claude" ? `Read by Claude${meta.model ? ` · ${meta.model.replace(/^claude-/, "")}` : ""}` : "Read deterministically"} — only facts quotable from the reply were written.
+        </li>
       </ul>
-    </div>
+    </details>
   );
 }
 
@@ -448,6 +517,7 @@ function AgentTracePanel({ action }: { action: AgentActionRow }) {
     ["Decision", t.decision],
     ["Action", `${ACTION_LABEL[action.meta.action_type]}${action.meta.gap_label ? ` — ${action.meta.gap_label}` : ""}`],
     ["Result", t.result ?? "Not executed yet."],
+    ...(action.meta.delivery ? ([["Delivery", `${DELIVERY_LABEL[action.meta.delivery.state]} — ${action.meta.delivery.detail}`]] as [string, React.ReactNode][]) : []),
   ];
   return (
     <details className="group mt-3 rounded-lg border border-border bg-card">

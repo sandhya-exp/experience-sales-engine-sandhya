@@ -86,7 +86,7 @@ export default async function LeadWorkspacePage({ params, searchParams }: PagePr
         <WorkspaceTabs
           defaultTab={tab}
           overview={<OverviewTab lead={lead} company={company} brief={brief} contacts={contacts} activities={activities} />}
-          contacts={<ContactsTab leadId={lead.id} companyId={company.id} contacts={contacts} />}
+          contacts={<ContactsTab leadId={lead.id} companyId={company.id} companyName={company.name} contacts={contacts} lead={lead} team={team} />}
           activity={
             <div className="space-y-4">
               {/* The conversation's raw material — a discovery call to process,

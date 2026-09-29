@@ -50,6 +50,10 @@ export interface Contact {
   title: string | null;
   is_primary: boolean;
   created_at: string;
+  /** Where the record came from — see lib/contacts/source.ts. Null on rows written before provenance existed. */
+  source?: string | null;
+  /** The contact's id in an external CRM, when it was imported from one. */
+  external_ref?: string | null;
 }
 
 export interface Lead {

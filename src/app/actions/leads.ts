@@ -231,7 +231,7 @@ export async function createManualLeadAction(
   const user = await getCurrentUser();
 
   const { company } = await findOrCreateCompanyForEmail(data.companyName, data.email, data.industry ?? null);
-  const contact = await findOrCreateContactForInquiry(company.id, data.contactName, data.email, data.phone ?? null);
+  const contact = await findOrCreateContactForInquiry(company.id, data.contactName, data.email, data.phone ?? null, "new_lead");
   const lead = await createLead({
     companyId: company.id,
     primaryContactId: contact.id,

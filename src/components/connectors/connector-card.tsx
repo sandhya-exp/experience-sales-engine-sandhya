@@ -71,24 +71,28 @@ export function ConnectorCard({ c, onChanged, selfUrl }: { c: ConnectorInfo; onC
           </p>
           <p className="truncate text-[12.5px] text-muted-foreground">{c.status.detail}</p>
         </button>
-        {/* The switch — on/off is the person's call; "connected" is the environment's. */}
-        <button
-          type="button"
-          role="switch"
-          aria-checked={c.enabled}
-          aria-label={`${c.enabled ? "Switch off" : "Switch on"} ${c.name}`}
-          disabled={pending}
-          onClick={() =>
-            start(async () => {
-              const r = await setConnectorEnabledAction(c.key, !c.enabled);
-              if (r.ok) { toast.success(r.detail); onChanged?.(); }
-              else toast.error(r.detail);
-            })
-          }
-          className={cn("relative h-6 w-11 shrink-0 rounded-full transition-colors", c.enabled ? "bg-navy" : "bg-muted-foreground/30", pending && "opacity-60")}
-        >
-          <span className={cn("absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition-transform", c.enabled ? "translate-x-5" : "translate-x-0.5")} />
-        </button>
+        {/* Configured connectors get an on/off switch; unconfigured ones get a Connect button (or nothing when only the environment can configure them). */}
+        {configured ? (
+          <button
+            type="button"
+            role="switch"
+            aria-checked={c.enabled}
+            aria-label={`${c.enabled ? "Switch off" : "Switch on"} ${c.name}`}
+            disabled={pending}
+            onClick={() => run(() => setConnectorEnabledAction(c.key, !c.enabled))}
+            className={cn("relative h-6 w-11 shrink-0 rounded-full transition-colors", c.enabled ? "bg-navy" : "bg-muted-foreground/30", pending && "opacity-60")}
+          >
+            <span className={cn("absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition-transform", c.enabled ? "translate-x-5" : "translate-x-0.5")} />
+          </button>
+        ) : c.connect ? (
+          <Button size="sm" variant="outline" className="shrink-0" onClick={() => setConnectOpen(true)}>
+            <Plug className="h-3.5 w-3.5" /> Connect
+          </Button>
+        ) : c.custom ? (
+          <Button size="sm" variant="outline" className="shrink-0" disabled={pending} onClick={() => run(() => testCustomServerAction(c.key))}>
+            <RefreshCw className="h-3.5 w-3.5" /> Test
+          </Button>
+        ) : null}
         <button type="button" onClick={() => setOpen((o) => !o)} aria-label={open ? "Hide details" : "Show details"} className="text-muted-foreground hover:text-foreground">
           <ChevronDown className={cn("h-4 w-4 transition-transform", open && "rotate-180")} />
         </button>

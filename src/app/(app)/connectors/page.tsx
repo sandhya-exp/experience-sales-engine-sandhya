@@ -23,7 +23,8 @@ export default async function ConnectorsPage() {
   const connected = connectors.filter((c) => c.status.state === "connected");
   const available = connectors.filter((c) => c.status.state !== "connected");
   const native = connectors.filter((c) => c.layer === "native");
-  const mcp = connectors.filter((c) => c.layer === "mcp");
+  const ownMcp = connectors.filter((c) => c.layer === "mcp" && c.key === "sales_engine");
+  const externalMcp = connectors.filter((c) => c.layer === "mcp" && c.key !== "sales_engine");
   const toolCount = connected.reduce((n, c) => n + c.tools.length, 0);
   const custom = connectors.filter((c) => c.custom);
 
@@ -34,7 +35,7 @@ export default async function ConnectorsPage() {
           <h1 className="text-[2rem] font-bold leading-tight tracking-tight text-foreground">Integrations &amp; MCP</h1>
           <AddServerDialog selfUrl={selfUrl} hasSettings={hasSettings} />
         </div>
-        <p className="mt-1 max-w-4xl text-[15px] text-muted-foreground">Native integrations are services the application talks to directly; MCP servers expose tools the AI agent calls through the standard tool interface. For each: authentication, server URL, tools and permissions, connection health, and which AI workflows use it. Connected means the vendor confirmed the credentials; nothing here is simulated.</p>
+        <p className="mt-1 max-w-4xl text-[15px] text-muted-foreground">Application integrations are services the Sales Engine calls directly (send an email, book a discovery call). MCP connections are standardized tool servers the AI Sales Agent works through: this application&rsquo;s own Sales Engine MCP, plus external and custom servers. For each: authentication, server URL, tools and permissions, connection health, and which AI workflows use it. Connected means the vendor confirmed the credentials; nothing here is simulated.</p>
       </div>
 
       <div className="grid gap-3 sm:grid-cols-3">
@@ -45,7 +46,7 @@ export default async function ConnectorsPage() {
 
       <section className="mt-6">
         <h2 className="mb-2 flex items-center gap-2 text-[12px] font-semibold uppercase tracking-wide text-muted-foreground">
-          <Link2 className="h-3.5 w-3.5" /> Native integrations
+          <Link2 className="h-3.5 w-3.5" /> Application integrations
         </h2>
         <ul className="space-y-2">
           {native.map((c) => (
@@ -59,7 +60,13 @@ export default async function ConnectorsPage() {
           <Plug className="h-3.5 w-3.5" /> MCP servers
         </h2>
         <ul className="space-y-2">
-          {mcp.map((c) => (
+          {ownMcp.map((c) => (
+            <ConnectorCard key={c.key} c={c} selfUrl={selfUrl} />
+          ))}
+        </ul>
+        <h3 className="mb-2 mt-4 text-[12px] font-semibold uppercase tracking-wide text-muted-foreground">External MCP servers</h3>
+        <ul className="space-y-2">
+          {externalMcp.map((c) => (
             <ConnectorCard key={c.key} c={c} selfUrl={selfUrl} />
           ))}
         </ul>

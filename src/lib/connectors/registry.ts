@@ -53,10 +53,10 @@ const BUILT_INS: BuiltIn[] = [
   {
     key: "sales_engine",
     layer: "mcp",
-    name: "Experience.com Sales Engine",
-    vendor: "Experience.com",
+    name: "Sales Engine MCP",
+    vendor: "This application",
     category: "internal",
-    description: "The Sales Engine's own record — leads, companies, contacts, activities, price list and deal history — exposed as MCP tools for the AI agent and for external MCP clients.",
+    description: "This application's own MCP server — leads, companies, contacts, activities, price list and deal history exposed as standardized tools, so the AI Sales Agent (and any external MCP client) works with Sales Engine data through one tool interface.",
     usedBy: ["AI Deal Brief", "AI Actions (propose / approve)", "Prepare quote with AI", "MCP endpoint /api/mcp"],
     tools: SALES_TOOLS.map((t) => ({ name: t.name, description: t.description, kind: t.kind, inputs: Object.keys(t.input_schema.properties) })),
     requiredEnv: ["DATABASE_URL", "MCP_API_KEY"],

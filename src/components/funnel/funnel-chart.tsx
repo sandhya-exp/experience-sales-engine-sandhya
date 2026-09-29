@@ -50,7 +50,7 @@ export function FunnelChart({ stages, selected, href }: { stages: FunnelStageSta
                       )}
                     </>
                   ) : (
-                    <>Closed-won · the end of the journey</>
+                    <>Closed-won · continues to contract, e-signature and onboarding</>
                   )}
                 </p>
               </div>

@@ -23,7 +23,7 @@ export const FUNNEL_STAGES: { key: FunnelStage; label: string; describe: string 
   { key: "discovery", label: "Discovery", describe: "A discovery call was booked or held" },
   { key: "qualified", label: "Qualified", describe: "Need, users, decision maker, timeline and budget confirmed" },
   { key: "quote_ready", label: "Quote Ready", describe: `Quoted, or marked ${DOWNSTREAM.name}` },
-  { key: "won", label: "Won", describe: "Closed-won" },
+  { key: "won", label: "Won", describe: "Closed-won — hands off to contract, e-signature and onboarding" },
 ];
 const RANK: Record<FunnelStage, number> = { inquiry: 0, contacted: 1, discovery: 2, qualified: 3, quote_ready: 4, won: 5 };
 const STATUS_STAGE: Record<LeadStatus, FunnelStage | null> = { new: "inquiry", contacted: "contacted", qualified: "qualified", quoted: "quote_ready", won: "won", lost: null };
@@ -38,6 +38,7 @@ export interface FunnelFilters {
 export interface FunnelLead {
   id: string;
   company_name: string;
+  contact_name: string | null;
   industry: string | null;
   owner_user_id: string | null;
   owner_name: string | null;
@@ -49,6 +50,8 @@ export interface FunnelLead {
   /** Stage the lead sits at now (furthest), or null when lost. */
   current: FunnelStage | null;
   lost: boolean;
+  /** When the journey ended (won or lost), ms epoch; null while open. */
+  endedAt: number | null;
   /** Entry time per stage reached, ms epoch. */
   entered: Partial<Record<FunnelStage, number>>;
   value: number;
@@ -94,11 +97,14 @@ export interface FunnelData {
   /** The stage with the largest drop-off, if any. */
   biggestDrop: { from: FunnelStage; to: FunnelStage; lost: number; share: number } | null;
   options: { owners: { id: string; name: string }[]; industries: string[]; sources: string[] };
+  /** When this was computed, ms epoch — "time so far" is measured against it. */
+  now: number;
 }
 
 type LeadRow = {
   id: string;
   company_name: string;
+  contact_name: string | null;
   industry: string | null;
   owner_user_id: string | null;
   owner_name: string | null;
@@ -114,10 +120,11 @@ type EventRow = { lead_id: string; kind: string; occurred_at: string; to_status:
 export async function loadFunnel(filters: FunnelFilters): Promise<FunnelData> {
   const [leads, events, quotes] = await Promise.all([
     query<LeadRow>(`
-      select l.id, c.name as company_name, c.industry, l.owner_user_id, u.name as owner_name, l.status, l.created_at,
+      select l.id, c.name as company_name, ct.name as contact_name, c.industry, l.owner_user_id, u.name as owner_name, l.status, l.created_at,
              l.number_of_users, l.interest, l.qualification, l.qualification_status
         from leads l
         join companies c on c.id = l.company_id
+        left join contacts ct on ct.id = l.primary_contact_id
         left join app_users u on u.id = l.owner_user_id`),
     query<EventRow>(`
       select lead_id,
@@ -177,6 +184,7 @@ export async function loadFunnel(filters: FunnelFilters): Promise<FunnelData> {
     const qualifiedAt = firstStatus(["qualified", "quoted", "won"]) ?? (l.qualification_status === "qualified" ? firstStatus(["qualified"]) : null);
     const quoteAt = firstStatus(["quoted", "won"]) ?? firstOf(["quote"]);
     const wonAt = firstStatus(["won"]);
+    const lostAt = firstStatus(["lost"]);
 
     // Furthest stage: the strongest evidence wins, and reaching a later stage implies the earlier ones.
     let furthestRank = Math.max(
@@ -209,6 +217,7 @@ export async function loadFunnel(filters: FunnelFilters): Promise<FunnelData> {
     return {
       id: l.id,
       company_name: l.company_name,
+      contact_name: l.contact_name,
       industry: l.industry,
       owner_user_id: l.owner_user_id,
       owner_name: l.owner_name,
@@ -218,6 +227,7 @@ export async function loadFunnel(filters: FunnelFilters): Promise<FunnelData> {
       furthest,
       current: lost ? null : furthest,
       lost,
+      endedAt: lost ? (lostAt ?? null) : wonAt ?? (l.status === "won" ? entered.won ?? null : null),
       entered,
       value: quoted ?? est?.amount ?? 0,
       valueKind: quoted !== undefined ? "quoted" : est ? "estimated" : null,
@@ -294,6 +304,7 @@ export async function loadFunnel(filters: FunnelFilters): Promise<FunnelData> {
     avgCycleDays: cycles.length ? Math.round(cycles.reduce((a, b) => a + b, 0) / cycles.length) : null,
     biggestDrop,
     options,
+    now: Date.now(),
   };
 }
 

@@ -75,7 +75,7 @@ export function AddServerDialog({
         <div className="space-y-3">
           <div className="space-y-1">
             <Label htmlFor="mcp-name">Name</Label>
-            <Input id="mcp-name" value={name} onChange={(e) => setName(e.target.value)} placeholder="Pricing service" />
+            <Input id="mcp-name" value={name} onChange={(e) => setName(e.target.value)} placeholder="Pricing Service MCP" />
           </div>
           <div className="space-y-1">
             <Label htmlFor="mcp-url">Server URL (HTTP / Streamable HTTP)</Label>

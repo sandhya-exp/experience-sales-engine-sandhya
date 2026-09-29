@@ -45,7 +45,8 @@ export function ConnectorsMenu() {
 
   const isConnected = (c: ConnectorInfo) => c.status.state === "connected" || c.status.state === "disabled" || c.status.state === "demo";
   const native = snap?.connectors.filter((c) => c.layer === "native") ?? [];
-  const mcp = snap?.connectors.filter((c) => c.layer === "mcp") ?? [];
+  const ownMcp = snap?.connectors.filter((c) => c.layer === "mcp" && c.key === "sales_engine") ?? [];
+  const externalMcp = snap?.connectors.filter((c) => c.layer === "mcp" && c.key !== "sales_engine") ?? [];
   const connectTarget = snap?.connectors.find((c) => c.key === connectKey) ?? null;
 
   return (
@@ -75,25 +76,30 @@ export function ConnectorsMenu() {
           )}
           {snap && (
             <div className={cn("max-h-[70vh] overflow-y-auto", loading && "opacity-60")}>
-              <DropdownMenuLabel className="px-2.5 py-1.5 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Integrations</DropdownMenuLabel>
+              <DropdownMenuLabel className="px-2.5 py-1.5 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Application integrations</DropdownMenuLabel>
               <ul>
                 {native.map((c) => (isConnected(c) ? <ConnectedRow key={c.key} c={c} onChanged={load} /> : <NotConnectedRow key={c.key} c={c} onPick={() => setConnectKey(c.key)} />))}
               </ul>
               <DropdownMenuSeparator />
               <DropdownMenuLabel className="flex items-center gap-2 px-2.5 py-1.5 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-                <Plug className="h-3.5 w-3.5" /> MCP
+                <Plug className="h-3.5 w-3.5" /> MCP servers
               </DropdownMenuLabel>
+              <ul>
+                {ownMcp.map((c) => (isConnected(c) ? <ConnectedRow key={c.key} c={c} onChanged={load} /> : <NotConnectedRow key={c.key} c={c} onPick={() => setConnectKey(c.key)} />))}
+              </ul>
+              <DropdownMenuSeparator />
+              <DropdownMenuLabel className="px-2.5 py-1.5 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">External MCP servers</DropdownMenuLabel>
+              <ul>
+                {externalMcp.map((c) => (isConnected(c) ? <ConnectedRow key={c.key} c={c} onChanged={load} /> : <NotConnectedRow key={c.key} c={c} onPick={() => setConnectKey(c.key)} />))}
+              </ul>
               <DropdownMenuItem onSelect={() => setAddOpen(true)} className="gap-2.5 px-2.5 py-2 text-[13.5px]">
-                <Plus className="h-4 w-4 text-muted-foreground" /> Add MCP server
+                <Plus className="h-4 w-4 text-muted-foreground" /> Add custom MCP server
               </DropdownMenuItem>
               <DropdownMenuItem asChild className="gap-2.5 px-2.5 py-2 text-[13.5px]">
                 <Link href="/connectors">
-                  <SlidersHorizontal className="h-4 w-4 text-muted-foreground" /> Manage MCP servers
+                  <SlidersHorizontal className="h-4 w-4 text-muted-foreground" /> Manage connections
                 </Link>
               </DropdownMenuItem>
-              <ul>
-                {mcp.map((c) => (isConnected(c) ? <ConnectedRow key={c.key} c={c} onChanged={load} /> : <NotConnectedRow key={c.key} c={c} onPick={() => setConnectKey(c.key)} />))}
-              </ul>
             </div>
           )}
         </DropdownMenuContent>

@@ -41,6 +41,32 @@ export interface ConnectorInfo {
   /** Custom servers: where it lives (token never included). */
   url?: string;
   docsUrl?: string;
+  /** Built-ins that can be connected from inside the app: what to ask for. Values are never included. */
+  connect?: ConnectSpec;
+  /** Where the credentials come from once connected, and what the vendor said we are connected as. */
+  connection?: ConnectionInfo;
+}
+
+export interface ConnectField {
+  /** Same name as the environment variable the connector also accepts. */
+  key: string;
+  label: string;
+  secret: boolean;
+  placeholder?: string;
+}
+
+export interface ConnectSpec {
+  intro: string;
+  capabilities: string[];
+  fields: ConnectField[];
+  help?: string;
+  docsUrl?: string;
+}
+
+export interface ConnectionInfo {
+  source: "env" | "saved";
+  account: string | null;
+  verifiedAt: string | null;
 }
 
 /** A tool as a workflow node the Flow Builder can place: what it needs and what it yields. */

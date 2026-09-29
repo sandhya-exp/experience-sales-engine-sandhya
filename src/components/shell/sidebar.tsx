@@ -52,7 +52,7 @@ export function Sidebar({
               Home
             </NavItem>
             <NavItem href="/pipeline" active={at("/pipeline")} icon={KanbanSquare} badge={attentionCount > 0 ? attentionCount : undefined} badgeTone="warning">
-              Pipeline
+              Sales Pipeline
             </NavItem>
             <NavItem href="/funnel" active={at("/funnel")} icon={Funnel}>
               Sales Funnel

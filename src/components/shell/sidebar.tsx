@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { BarChart3, CalendarDays, Building2, FileText, Home, KanbanSquare, ListChecks, PackageCheck } from "lucide-react";
+import { BarChart3, CalendarDays, Building2, FileText, Funnel, Home, KanbanSquare, ListChecks, PackageCheck } from "lucide-react";
 import { DOWNSTREAM } from "@/lib/modules";
 import { ExperienceLogo } from "@/components/brand/logo";
 import { cn } from "@/lib/utils";
@@ -53,6 +53,9 @@ export function Sidebar({
             </NavItem>
             <NavItem href="/pipeline" active={at("/pipeline")} icon={KanbanSquare} badge={attentionCount > 0 ? attentionCount : undefined} badgeTone="warning">
               Pipeline
+            </NavItem>
+            <NavItem href="/funnel" active={at("/funnel")} icon={Funnel}>
+              Sales Funnel
             </NavItem>
             <NavItem href="/quotes" active={at("/quotes")} icon={FileText} badge={quoteCount > 0 ? quoteCount : undefined}>
               Quotes

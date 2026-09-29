@@ -24,12 +24,12 @@ export default async function ConnectorsPage() {
 
   return (
     <div className="mx-auto max-w-6xl px-6 pb-12 pt-8">
-      <div className="mb-6 flex flex-wrap items-end justify-between gap-4">
-        <div>
+      <div className="mb-6">
+        <div className="flex items-start justify-between gap-4">
           <h1 className="text-[2rem] font-bold leading-tight tracking-tight text-foreground">MCP Connectors</h1>
-          <p className="mt-1 text-[15px] text-muted-foreground">External systems the Sales Engine can reach, and the tools each exposes to the AI agent and to workflows. Connected means credentials are present; nothing here is simulated.</p>
+          <AddServerDialog selfUrl={`${origin}/api/mcp`} hasSettings={hasSettings} />
         </div>
-        <AddServerDialog selfUrl={`${origin}/api/mcp`} hasSettings={hasSettings} />
+        <p className="mt-1 max-w-4xl text-[15px] text-muted-foreground">External systems the Sales Engine can reach, and the tools each exposes to the AI agent and to workflows. Connected means credentials are present; nothing here is simulated.</p>
       </div>
 
       <div className="grid gap-3 sm:grid-cols-3">

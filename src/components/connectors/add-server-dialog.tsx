@@ -39,8 +39,8 @@ export function AddServerDialog({ selfUrl, hasSettings }: { selfUrl: string; has
       }}
     >
       <DialogTrigger asChild>
-        <Button variant="navy" className="gap-1.5">
-          <Plus className="h-4 w-4" /> Add custom MCP server
+        <Button variant="navy" size="icon" className="h-10 w-10 shrink-0 rounded-full" title="Add custom MCP server" aria-label="Add custom MCP server">
+          <Plus className="h-5 w-5" />
         </Button>
       </DialogTrigger>
       <DialogContent className="max-w-lg">

@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Search, Plus, Plug } from "lucide-react";
+import { Search, Plus } from "lucide-react";
 import { ExperienceLogo } from "@/components/brand/logo";
 import { Button } from "@/components/ui/button";
 import { UserMenu } from "@/components/shell/user-menu";
@@ -7,6 +7,7 @@ import type { SessionUser } from "@/lib/auth";
 import { NewLeadDialog } from "@/components/dashboard/new-lead-dialog";
 import { NotificationBell } from "@/components/shell/notification-bell";
 import { RecentActivityMenu } from "@/components/shell/recent-activity-menu";
+import { ConnectorsMenu } from "@/components/connectors/connectors-menu";
 import { listRecentActivities } from "@/lib/repo/activities";
 import { getNotificationState } from "@/lib/notifications";
 
@@ -43,14 +44,7 @@ export async function TopBar({ user, initialQuery }: { user: SessionUser; initia
             <Plus className="h-4 w-4" /> New Lead
           </Button>
         </NewLeadDialog>
-        <Link
-          href="/connectors"
-          title="MCP Connectors"
-          aria-label="MCP Connectors"
-          className="flex h-9 w-9 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-ring/30"
-        >
-          <Plug className="h-[18px] w-[18px]" />
-        </Link>
+        <ConnectorsMenu />
         <NotificationBell initial={notifications} />
         <UserMenu user={user} />
       </div>

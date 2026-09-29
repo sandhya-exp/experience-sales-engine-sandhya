@@ -3,13 +3,30 @@
 import { randomUUID } from "node:crypto";
 import { revalidatePath } from "next/cache";
 import { getCurrentUser } from "@/lib/auth";
-import { customServers, saveCustomServers, setConnectorEnabled, testCustomServer } from "@/lib/connectors/registry";
+import { headers } from "next/headers";
+import { customServers, listConnectors, saveCustomServers, setConnectorEnabled, testCustomServer, workflowNodes } from "@/lib/connectors/registry";
+import type { ConnectorInfo, WorkflowNode } from "@/lib/connectors/types";
 import { probeMcpServer } from "@/lib/connectors/mcpClient";
 import { settingsAvailable } from "@/lib/repo/settings";
 
 export interface ConnectorActionResult {
   ok: boolean;
   detail: string;
+}
+
+export interface ConnectorsSnapshot {
+  connectors: ConnectorInfo[];
+  nodes: WorkflowNode[];
+  hasSettings: boolean;
+  selfUrl: string;
+}
+
+/** Everything the MCP Connectors dialog shows, loaded when it opens. */
+export async function loadConnectorsAction(): Promise<ConnectorsSnapshot> {
+  const h = await headers();
+  const origin = `${h.get("x-forwarded-proto") ?? "https"}://${h.get("x-forwarded-host") ?? h.get("host") ?? "localhost:3000"}`;
+  const [connectors, nodes, hasSettings] = await Promise.all([listConnectors(), workflowNodes(), settingsAvailable()]);
+  return { connectors, nodes, hasSettings, selfUrl: `${origin}/api/mcp` };
 }
 
 export async function setConnectorEnabledAction(key: string, enabled: boolean): Promise<ConnectorActionResult> {

@@ -35,7 +35,7 @@ const KIND: Record<ToolKind, { label: string; variant: "outline" | "navy" | "war
 };
 
 /** One connector, in the style of a connector-manager row: identity, status, a switch, and details on demand. */
-export function ConnectorCard({ c }: { c: ConnectorInfo }) {
+export function ConnectorCard({ c, onChanged }: { c: ConnectorInfo; onChanged?: () => void }) {
   const [open, setOpen] = useState(false);
   const [pending, start] = useTransition();
   const Icon = ICON[c.category];
@@ -71,7 +71,7 @@ export function ConnectorCard({ c }: { c: ConnectorInfo }) {
           onClick={() =>
             start(async () => {
               const r = await setConnectorEnabledAction(c.key, !c.enabled);
-              if (r.ok) toast.success(r.detail);
+              if (r.ok) { toast.success(r.detail); onChanged?.(); }
               else toast.error(r.detail);
             })
           }
@@ -131,7 +131,7 @@ export function ConnectorCard({ c }: { c: ConnectorInfo }) {
                     onClick={() =>
                       start(async () => {
                         const r = await testCustomServerAction(c.key);
-                        if (r.ok) toast.success(r.detail);
+                        if (r.ok) { toast.success(r.detail); onChanged?.(); }
                         else toast.error(r.detail);
                       })
                     }
@@ -146,7 +146,7 @@ export function ConnectorCard({ c }: { c: ConnectorInfo }) {
                     onClick={() =>
                       start(async () => {
                         const r = await removeCustomServerAction(c.key);
-                        if (r.ok) toast.success(r.detail);
+                        if (r.ok) { toast.success(r.detail); onChanged?.(); }
                         else toast.error(r.detail);
                       })
                     }

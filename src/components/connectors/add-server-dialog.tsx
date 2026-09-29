@@ -15,8 +15,28 @@ import { addCustomServerAction, probeServerAction } from "@/app/actions/connecto
  * The app's own /api/mcp is offered as a one-click example, which doubles as
  * proof that the client and server speak the same protocol.
  */
-export function AddServerDialog({ selfUrl, hasSettings }: { selfUrl: string; hasSettings: boolean }) {
-  const [open, setOpen] = useState(false);
+export function AddServerDialog({
+  selfUrl,
+  hasSettings,
+  onChanged,
+  open: controlledOpen,
+  onOpenChange,
+  showTrigger = true,
+}: {
+  selfUrl: string;
+  hasSettings: boolean;
+  onChanged?: () => void;
+  /** Controlled mode (opened from a menu): pass open + onOpenChange and hide the trigger. */
+  open?: boolean;
+  onOpenChange?: (o: boolean) => void;
+  showTrigger?: boolean;
+}) {
+  const [innerOpen, setInnerOpen] = useState(false);
+  const open = controlledOpen ?? innerOpen;
+  const setOpen = (o: boolean) => {
+    setInnerOpen(o);
+    onOpenChange?.(o);
+  };
   const [name, setName] = useState("");
   const [url, setUrl] = useState("");
   const [token, setToken] = useState("");
@@ -38,11 +58,13 @@ export function AddServerDialog({ selfUrl, hasSettings }: { selfUrl: string; has
         if (!o) reset();
       }}
     >
-      <DialogTrigger asChild>
-        <Button variant="navy" size="icon" className="h-10 w-10 shrink-0 rounded-full" title="Add custom MCP server" aria-label="Add custom MCP server">
-          <Plus className="h-5 w-5" />
-        </Button>
-      </DialogTrigger>
+      {showTrigger && (
+        <DialogTrigger asChild>
+          <Button variant="navy" size="icon" className="h-10 w-10 shrink-0 rounded-full" title="Add custom MCP server" aria-label="Add custom MCP server">
+            <Plus className="h-5 w-5" />
+          </Button>
+        </DialogTrigger>
+      )}
       <DialogContent className="max-w-lg">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
@@ -103,6 +125,7 @@ export function AddServerDialog({ selfUrl, hasSettings }: { selfUrl: string; has
                   toast.success(r.detail);
                   setOpen(false);
                   reset();
+                  onChanged?.();
                 } else toast.error(r.detail);
               }}
             >

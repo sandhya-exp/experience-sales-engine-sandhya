@@ -5,7 +5,7 @@
  * and lives in the server action (app/actions/contacts.ts).
  */
 
-export type ContactField = "name" | "first_name" | "last_name" | "email" | "phone" | "company" | "title" | "owner" | "external_ref" | "ignore";
+export type ContactField = "name" | "first_name" | "last_name" | "email" | "phone" | "company" | "title" | "owner" | "external_ref" | "users" | "interest" | "requirements" | "ignore";
 
 export const CONTACT_FIELD_LABELS: Record<ContactField, string> = {
   name: "Full name",
@@ -17,6 +17,9 @@ export const CONTACT_FIELD_LABELS: Record<ContactField, string> = {
   title: "Job title",
   owner: "Owner",
   external_ref: "External id",
+  users: "Number of users (lead)",
+  interest: "Interested in (lead)",
+  requirements: "Requirements (lead)",
   ignore: "Skip this column",
 };
 
@@ -31,6 +34,9 @@ const SYNONYMS: [ContactField, string[]][] = [
   ["title", ["title", "job title", "jobtitle", "role", "position", "designation", "job"]],
   ["owner", ["owner", "contact owner", "account owner", "rep", "sales rep", "assigned to", "assigned", "owner name", "salesperson"]],
   ["external_ref", ["id", "contact id", "record id", "hubspot id", "salesforce id", "crm id", "external id", "sfdc id"]],
+  ["users", ["users", "number of users", "user count", "seats", "employees", "headcount", "agents", "loan officers", "team size"]],
+  ["interest", ["interest", "interested in", "product", "product interest", "solution", "area"]],
+  ["requirements", ["requirements", "notes", "needs", "description", "comments", "message", "use case"]],
 ];
 
 function norm(h: string) {
@@ -108,6 +114,10 @@ export interface ImportRow {
   title: string | null;
   owner: string | null;
   external_ref: string | null;
+  /** Lead fields, when the sheet carries them. */
+  users: number | null;
+  interest: string | null;
+  requirements: string | null;
   /** Problems the row cannot be imported with. */
   errors: string[];
   /** Things worth a look that do not block the row. */
@@ -141,6 +151,10 @@ export function buildRows(rows: string[][], mapping: ContactField[]): ImportRow[
     const title = get(r, "title") || null;
     const owner = get(r, "owner") || null;
     const external_ref = get(r, "external_ref") || null;
+    const usersRaw = get(r, "users").replace(/[,\s]/g, "");
+    const users = usersRaw && /^\d+$/.test(usersRaw) ? Number(usersRaw) : null;
+    const interest = get(r, "interest") || null;
+    const requirements = get(r, "requirements") || null;
     const errors: string[] = [];
     const warnings: string[] = [];
     if (!email) errors.push("Missing email");
@@ -152,7 +166,8 @@ export function buildRows(rows: string[][], mapping: ContactField[]): ImportRow[
     if (!name && !errors.length) errors.push("Missing name");
     if (email && EMAIL_RE.test(email) && !emailDomain(email) && !company) warnings.push("Personal email and no company — the contact will need a company");
     if (phone && !/^[+(]?[\d][\d\s().+-]{5,}$/.test(phone)) warnings.push(`Phone “${phone}” does not look like a number`);
-    return { line: n + 2, name, email, phone, company, title, owner, external_ref, errors, warnings };
+    if (usersRaw && users === null) warnings.push(`Users “${get(r, "users")}” is not a number`);
+    return { line: n + 2, name, email, phone, company, title, owner, external_ref, users, interest, requirements, errors, warnings };
   });
 }
 
@@ -170,12 +185,12 @@ export function duplicatesWithinFile(rows: ImportRow[]): Map<number, number> {
 }
 
 /** A small sample file the Import dialog offers, so the flow can be tried without hunting for a CSV. */
-export const SAMPLE_CSV = `First Name,Last Name,Work Email,Phone,Company,Job Title,Owner
-Dana,Whitfield,dana.whitfield@planethomelending.example,+1 (415) 555-0100,Planet Home Lending,VP Customer Experience,Sandhya
-Marcus,Bell,marcus.bell@planethomelending.example,+1 (415) 555-0101,Planet Home Lending,Director of Operations,Sandhya
-Elena,Ruiz,elena.ruiz@meridianhomeloans.example,,Meridian Home Loans,COO,Marcus Lee
-Priya,Nair,priya.nair@northstarrealty.example,+1 (212) 555-0199,Northstar Realty,Head of Marketing,
-Sam,Okoro,sam.okoro,555-0102,Okoro Dental,Practice Manager,
-,,jane@gmail.com,,,,
-Elena,Ruiz,elena.ruiz@meridianhomeloans.example,+1 (303) 555-0177,Meridian Home Loans,Chief Operating Officer,Marcus Lee
+export const SAMPLE_CSV = `First Name,Last Name,Work Email,Phone,Company,Job Title,Owner,Number of Users,Interested In,Notes
+Dana,Whitfield,dana.whitfield@planethomelending.example,+1 (415) 555-0100,Planet Home Lending,VP Customer Experience,Sandhya,200,Reputation Management,Renewal — wants advanced analytics
+Marcus,Bell,marcus.bell@planethomelending.example,+1 (415) 555-0101,Planet Home Lending,Director of Operations,Sandhya,,,
+Elena,Ruiz,elena.ruiz@meridianhomeloans.example,,Meridian Home Loans,COO,Marcus Lee,1200,Experience Management Platform,
+Priya,Nair,priya.nair@northstarrealty.example,+1 (212) 555-0199,Northstar Realty,Head of Marketing,,85,Online Listings,Three branches; listings first then reviews
+Sam,Okoro,sam.okoro,555-0102,Okoro Dental,Practice Manager,,12,Reviews Monitoring,
+,,jane@gmail.com,,,,,,,
+Elena,Ruiz,elena.ruiz@meridianhomeloans.example,+1 (303) 555-0177,Meridian Home Loans,Chief Operating Officer,Marcus Lee,,,
 `;

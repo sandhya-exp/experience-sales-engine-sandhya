@@ -82,7 +82,7 @@ export function Sidebar({
               MCP Connectors
             </NavItem>
             {canContract && (
-              <NavItem href={DOWNSTREAM.route} active={pathname === "/pipeline" && false} icon={PackageCheck}>
+              <NavItem href={DOWNSTREAM.route} active={at("/contract")} icon={PackageCheck}>
                 {DOWNSTREAM.navLabel}
               </NavItem>
             )}

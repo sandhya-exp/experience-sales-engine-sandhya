@@ -52,6 +52,13 @@ export interface FunnelLead {
   lost: boolean;
   /** When the journey ended (won or lost), ms epoch; null while open. */
   endedAt: number | null;
+  /** The reason given when the deal was marked lost, if any. */
+  lostReason: string | null;
+  /** Last activity of any kind, ms epoch. */
+  lastActivityAt: number | null;
+  /** A booked follow-up whose time has passed with nothing logged since. */
+  missedFollowUp: boolean;
+  qualificationStatus: string;
   /** Entry time per stage reached, ms epoch. */
   entered: Partial<Record<FunnelStage, number>>;
   value: number;
@@ -116,9 +123,10 @@ type LeadRow = {
   qualification_status: string;
 };
 type EventRow = { lead_id: string; kind: string; occurred_at: string; to_status: string | null; body: string | null; meta: Record<string, unknown> | null };
+type SignalRow = { lead_id: string; last_activity_at: string | null; overdue_follow_up: boolean };
 
 export async function loadFunnel(filters: FunnelFilters): Promise<FunnelData> {
-  const [leads, events, quotes] = await Promise.all([
+  const [leads, events, quotes, signals] = await Promise.all([
     query<LeadRow>(`
       select l.id, c.name as company_name, ct.name as contact_name, c.industry, l.owner_user_id, u.name as owner_name, l.status, l.created_at,
              l.number_of_users, l.interest, l.qualification, l.qualification_status
@@ -146,7 +154,19 @@ export async function loadFunnel(filters: FunnelFilters): Promise<FunnelData> {
     query<{ lead_id: string; total: number; superseded: boolean }>(`
       select lead_id, (metadata->>'total')::numeric as total, coalesce((metadata->>'superseded')::boolean, false) as superseded
         from activities where metadata->>'kind' = 'quote' order by occurred_at desc`),
+    query<SignalRow>(`
+      select l.id as lead_id,
+             (select max(a.occurred_at) from activities a where a.lead_id = l.id) as last_activity_at,
+             exists(
+               select 1 from activities f
+                where f.lead_id = l.id and f.metadata->>'kind' = 'follow_up'
+                  and coalesce((f.metadata->>'completed')::boolean, false) = false
+                  and (f.metadata->>'scheduled_for')::timestamptz < now()
+                  and not exists (select 1 from activities z where z.lead_id = l.id and z.occurred_at > (f.metadata->>'scheduled_for')::timestamptz)
+             ) as overdue_follow_up
+        from leads l`),
   ]);
+  const signalOf = new Map(signals.map((r) => [r.lead_id, r]));
 
   /* ---- per-lead events ---------------------------------------------------- */
   const byLead = new Map<string, EventRow[]>();
@@ -184,7 +204,10 @@ export async function loadFunnel(filters: FunnelFilters): Promise<FunnelData> {
     const qualifiedAt = firstStatus(["qualified", "quoted", "won"]) ?? (l.qualification_status === "qualified" ? firstStatus(["qualified"]) : null);
     const quoteAt = firstStatus(["quoted", "won"]) ?? firstOf(["quote"]);
     const wonAt = firstStatus(["won"]);
-    const lostAt = firstStatus(["lost"]);
+    const lostEv = evs.find((e) => e.kind === "status" && (e.to_status ?? legacyTo(e.body)) === "lost");
+    const lostAt = lostEv ? t(lostEv) : null;
+    const lostReason = typeof lostEv?.meta?.reason === "string" ? (lostEv.meta.reason as string) : null;
+    const sig = signalOf.get(l.id);
 
     // Furthest stage: the strongest evidence wins, and reaching a later stage implies the earlier ones.
     let furthestRank = Math.max(
@@ -228,6 +251,10 @@ export async function loadFunnel(filters: FunnelFilters): Promise<FunnelData> {
       current: lost ? null : furthest,
       lost,
       endedAt: lost ? (lostAt ?? null) : wonAt ?? (l.status === "won" ? entered.won ?? null : null),
+      lostReason,
+      lastActivityAt: sig?.last_activity_at ? new Date(sig.last_activity_at).getTime() : null,
+      missedFollowUp: Boolean(sig?.overdue_follow_up),
+      qualificationStatus: l.qualification_status,
       entered,
       value: quoted ?? est?.amount ?? 0,
       valueKind: quoted !== undefined ? "quoted" : est ? "estimated" : null,

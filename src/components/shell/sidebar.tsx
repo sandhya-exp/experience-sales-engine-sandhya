@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { BarChart3, CalendarDays, Building2, FileText, Funnel, Home, KanbanSquare, ListChecks, PackageCheck, Plug } from "lucide-react";
+import { BarChart3, CalendarDays, Building2, FileText, Funnel, Home, KanbanSquare, ListChecks, PackageCheck } from "lucide-react";
 import { DOWNSTREAM } from "@/lib/modules";
 import { ExperienceLogo } from "@/components/brand/logo";
 import { cn } from "@/lib/utils";
@@ -77,9 +77,6 @@ export function Sidebar({
             </NavItem>
             <NavItem href="/companies" active={at("/companies")} icon={Building2}>
               Companies
-            </NavItem>
-            <NavItem href="/connectors" active={at("/connectors")} icon={Plug}>
-              MCP Connectors
             </NavItem>
             {canContract && (
               <NavItem href={DOWNSTREAM.route} active={at("/contract")} icon={PackageCheck}>

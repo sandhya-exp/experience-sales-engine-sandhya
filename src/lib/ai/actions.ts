@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import { discoverySummary } from "@/lib/connectors/registry";
 import { query, queryOne } from "@/lib/db";
 import { recordActivity } from "@/lib/repo/activities";
 import { assignLeadOwner, getLeadById, updateLeadStatus, updateQualification as updateQualificationRepo } from "@/lib/repo/leads";
@@ -97,6 +98,9 @@ export async function proposeAgentAction(input: DecisionInput, opts: ProposeOpti
   const decision = decideAgentAction({ ...input, now: opts.now });
   await supersedeProposedActions(input.lead.id);
   if (!decision) return null;
+  // What the agent could reach at decision time — recorded on the trace so
+  // "why did it draft an email instead of booking a call" has an answer.
+  const connectorsAvailable = await discoverySummary().catch(() => [] as string[]);
 
   const contact = primaryContact(input.contacts, input.lead.primary_contact_id);
   let draft: AgentActionMeta["draft_message"] = null;
@@ -129,6 +133,7 @@ export async function proposeAgentAction(input: DecisionInput, opts: ProposeOpti
   }
 
   const meta = toMeta(decision, draft);
+  meta.trace = { ...meta.trace, connectors_available: connectorsAvailable };
   if (composeNote) meta.trace = { ...meta.trace, decision: `${meta.trace.decision} ${composeNote}` };
   if (decision.action_type === "prepare_call") {
     const m = nextMeeting(input.activities, opts.now ?? new Date());

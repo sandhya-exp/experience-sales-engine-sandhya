@@ -1,6 +1,6 @@
 import { BarChart3 } from "lucide-react";
 import { salesMetrics, windowFor, describeWindow, isMetricRange, compactMoney, percent, type MetricRangeKey } from "@/lib/repo/metrics";
-import { KpiTile, RevenueByMonth, StageFunnel, WinLossBar } from "@/components/reports/charts";
+import { BreakdownBars, KpiTile, RevenueByMonth, StageFunnel, WinLossBar } from "@/components/reports/charts";
 import { Panel } from "@/components/dashboard/home-cards";
 import { GenerateReportDialog } from "@/components/reports/generate-report";
 import { ReportRangeField } from "@/components/reports/report-range";
@@ -85,6 +85,20 @@ export default async function ReportsPage({ searchParams }: PageProps<"/reports"
                 <Row term="Quotes accepted" value={String(m.quotesAccepted)} />
                 <Row term="Open opportunities right now" value={String(m.openCount)} />
               </dl>
+            </Panel>
+
+            <Panel label="Losses" title="Lost by reason" question="Why do we lose?" icon={BarChart3}>
+              <BreakdownBars rows={m.lostByReason} tone="destructive" money={compactMoney} emptyText="No deals were lost in this period." />
+              <p className="mt-3 border-t border-border pt-2.5 text-[12px] text-muted-foreground">
+                The reason a rep gave when marking the deal lost. Value is the quote that was on the table, where there was one.
+              </p>
+            </Panel>
+
+            <Panel label="Sources" title="Won by source" question="Where do wins come from?" icon={BarChart3}>
+              <BreakdownBars rows={m.wonBySource} tone="success" money={compactMoney} emptyText="Nothing has been won in this period." />
+              <p className="mt-3 border-t border-border pt-2.5 text-[12px] text-muted-foreground">
+                The customer&rsquo;s own &ldquo;how did you hear about us&rdquo; from the inquiry form, else the channel the lead arrived through.
+              </p>
             </Panel>
           </div>
         </>

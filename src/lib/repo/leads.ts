@@ -10,8 +10,10 @@ export interface CreateLeadInput {
   interest: string | null;
   requirements: string | null;
   additionalInfo?: string | null;
-  /** Where the inquiry came from, for the timeline: "website inquiry form", "API (branvidia)", … */
+  /** The channel the inquiry arrived through, for the timeline: "Talk to Sales form", "API (branvidia)", … */
   source?: string;
+  /** The customer's own answer to "How did you hear about us?", when the form asked. */
+  heardFrom?: string | null;
 }
 
 export async function createLead(input: CreateLeadInput): Promise<Lead> {
@@ -24,8 +26,10 @@ export async function createLead(input: CreateLeadInput): Promise<Lead> {
   await recordActivity({
     leadId: (lead as Lead).id,
     type: "note",
-    body: `Lead created from ${input.source ?? "customer inquiry"}.`,
+    body: `Lead created from ${input.source ?? "customer inquiry"}.${input.heardFrom ? ` Heard about us via ${input.heardFrom}.` : ""}`,
     actorName: "System",
+    // Structured so Reports can group wins by where they came from.
+    metadata: { kind: "lead_created", channel: input.source ?? "customer inquiry", ...(input.heardFrom ? { heard_from: input.heardFrom } : {}) },
   });
   return lead as Lead;
 }
@@ -80,21 +84,29 @@ export async function listLeadRows(): Promise<LeadListRow[]> {
   `);
 }
 
-export async function updateLeadStatus(id: string, status: LeadStatus, actorName: string): Promise<Lead> {
+/** Why a deal closed the way it did — captured on the status_change, not on the lead. */
+export interface StageChangeDetail {
+  reason?: string | null;
+  note?: string | null;
+}
+
+export async function updateLeadStatus(id: string, status: LeadStatus, actorName: string, detail: StageChangeDetail = {}): Promise<Lead> {
   const previous = await getLeadById(id);
   const updated = await queryOne<Lead>(
     `update leads set status = $2 ${status === "quoted" ? ", quote_requested_at = now()" : ""} where id = $1 returning *`,
     [id, status]
   );
   if (previous && previous.status !== status) {
+    const reason = detail.reason?.trim() || null;
+    const note = detail.note?.trim() || null;
     await recordActivity({
       leadId: id,
       type: "status_change",
-      body: `Stage changed from ${previous.status} to ${status}.`,
+      body: `Stage changed from ${previous.status} to ${status}.${reason ? ` Reason: ${reason}.` : ""}${note ? ` ${note}` : ""}`,
       actorName,
-      // Structured too, so "how many reached Qualified last week" is a query
-      // rather than a string match on the sentence above.
-      metadata: { kind: "status_change", from: previous.status, to: status },
+      // Structured too, so "how many reached Qualified last week" and "why do
+      // we lose" are queries rather than string matches on the sentence above.
+      metadata: { kind: "status_change", from: previous.status, to: status, ...(reason ? { reason } : {}), ...(note ? { note } : {}) },
     });
   }
   return updated as Lead;

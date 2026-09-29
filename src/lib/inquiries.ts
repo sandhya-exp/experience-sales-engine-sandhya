@@ -26,6 +26,7 @@ export async function createInquiryLead(data: InquiryInputType, source: string) 
     requirements: data.requirements ?? null,
     additionalInfo: data.additionalInfo ?? null,
     source,
+    heardFrom: data.heardFrom ?? null,
   });
 
   // Route to an owner: the sector specialist for this industry, else whoever has

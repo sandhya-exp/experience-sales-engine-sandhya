@@ -4,6 +4,7 @@ import { useState, useTransition } from "react";
 import { ArrowRight, AlertCircle } from "lucide-react";
 import { submitTalkToSales } from "@/app/actions/inquiry";
 import { INTEREST_OPTIONS, TalkToSalesInput, fieldErrors, type TalkToSalesField } from "@/lib/inquiry-schema";
+import { LEAD_SOURCES } from "@/lib/dealSignals";
 import { INDUSTRIES } from "@/lib/industries";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -25,6 +26,7 @@ const EMPTY: Values = {
   interest: "",
   requirements: "",
   additionalInfo: "",
+  heardFrom: "",
 };
 
 /**
@@ -160,6 +162,20 @@ export function TalkToSalesForm() {
         </Field>
         <Field id="tts-additionalInfo" label="Additional information" optional error={errors.additionalInfo}>
           <Textarea id="tts-additionalInfo" name="additionalInfo" rows={2} placeholder="Timeline, systems you use today, anyone else we should include…" value={values.additionalInfo} onChange={(e) => set("additionalInfo")(e.target.value)} onBlur={blur("additionalInfo")} aria-invalid={!!errors.additionalInfo} />
+        </Field>
+        <Field id="tts-heardFrom" label="How did you hear about us?" optional error={errors.heardFrom}>
+          <Select value={values.heardFrom || undefined} onValueChange={(v) => set("heardFrom")(v)} name="heardFrom">
+            <SelectTrigger id="tts-heardFrom">
+              <SelectValue placeholder="Choose one" />
+            </SelectTrigger>
+            <SelectContent>
+              {LEAD_SOURCES.map((opt) => (
+                <SelectItem key={opt} value={opt}>
+                  {opt}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </Field>
       </fieldset>
 

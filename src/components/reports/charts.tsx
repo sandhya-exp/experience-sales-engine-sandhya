@@ -1,5 +1,5 @@
 import { cn } from "@/lib/utils";
-import { compactMoney, percent, type FunnelStep, type MonthPoint } from "@/lib/repo/metrics";
+import { compactMoney, percent, type Breakdown, type FunnelStep, type MonthPoint } from "@/lib/repo/metrics";
 
 /**
  * The report visuals: a KPI tile, a stage funnel and a month-by-month bar.
@@ -150,5 +150,38 @@ export function WinLossBar({ won, lost }: { won: number; lost: number }) {
         </span>
       </div>
     </div>
+  );
+}
+
+
+/**
+ * A ranked breakdown — lost reasons, won sources — as labelled bars. The bar is
+ * proportional to the count; the value column carries the money behind it when
+ * there is any, so "we lose most on Price" and "Referrals are worth the most"
+ * both read from the same shape.
+ */
+export function BreakdownBars({ rows, tone = "muted", emptyText, money }: { rows: Breakdown[]; tone?: "success" | "muted" | "destructive"; emptyText: string; money: (n: number) => string }) {
+  if (rows.length === 0) return <p className="py-6 text-center text-[13px] text-muted-foreground">{emptyText}</p>;
+  const max = Math.max(...rows.map((r) => r.count));
+  const total = rows.reduce((n, r) => n + r.count, 0);
+  const fill = tone === "success" ? "bg-success/80" : tone === "destructive" ? "bg-destructive/70" : "bg-muted-foreground/40";
+  return (
+    <ol className="space-y-2.5">
+      {rows.map((r) => (
+        <li key={r.label} className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 gap-y-1 text-[13px]">
+          <div className="flex items-baseline justify-between gap-3">
+            <span className="truncate text-foreground">{r.label}</span>
+            <span className="shrink-0 tabular-nums text-muted-foreground">
+              {r.count} deal{r.count === 1 ? "" : "s"}
+              {r.value > 0 ? ` · ${money(r.value)}` : ""}
+            </span>
+          </div>
+          <span className="w-10 text-right text-[12px] font-semibold tabular-nums text-foreground">{total > 0 ? `${Math.round((r.count / total) * 100)}%` : ""}</span>
+          <div className="col-span-2 h-2 overflow-hidden rounded-full bg-muted">
+            <div className={`h-full rounded-full ${fill}`} style={{ width: `${(r.count / max) * 100}%` }} />
+          </div>
+        </li>
+      ))}
+    </ol>
   );
 }

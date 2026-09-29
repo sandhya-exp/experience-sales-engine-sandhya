@@ -60,6 +60,8 @@ export const InquiryInput = z.object({
   industry: z.string().trim().optional().transform((v) => (v ? v : undefined)),
   requirements: optionalText,
   additionalInfo: optionalText,
+  /** "How did you hear about us?" — optional; Reports groups won deals by it. */
+  heardFrom: optionalText,
 });
 export type InquiryInput = z.infer<typeof InquiryInput>;
 

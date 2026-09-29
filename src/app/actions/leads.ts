@@ -75,9 +75,9 @@ export async function updateQualificationAction(leadId: string, formData: FormDa
   revalidatePath("/pipeline");
 }
 
-export async function updateStageAction(leadId: string, status: LeadStatus) {
+export async function updateStageAction(leadId: string, status: LeadStatus, detail?: { reason?: string | null; note?: string | null }) {
   const name = await actorName();
-  await updateLeadStatus(leadId, status, name);
+  await updateLeadStatus(leadId, status, name, detail ?? {});
   revalidatePath(`/leads/${leadId}`);
   revalidatePath("/");
   revalidatePath("/pipeline");

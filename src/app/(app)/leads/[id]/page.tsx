@@ -66,6 +66,7 @@ export default async function LeadWorkspacePage({ params, searchParams }: PagePr
         focusField={focusField}
         canContract={canContract}
         quote={quote}
+        activities={activities}
       />
       {/* The conclusion, above the tabs: what to do next, with a link to why. */}
       <div className="px-6 pt-5">

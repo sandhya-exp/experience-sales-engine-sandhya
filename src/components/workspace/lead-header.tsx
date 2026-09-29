@@ -8,8 +8,11 @@ import { OwnerSelect } from "@/components/workspace/owner-select";
 import { StageTracker } from "@/components/workspace/stage-tracker";
 import type { FollowUp } from "@/lib/repo/followups";
 import type { TeamMember } from "@/lib/repo/users";
-import type { Company, Contact, Lead } from "@/lib/types";
-import type { QuoteRow } from "@/lib/repo/quotes";
+import type { Activity, Company, Contact, Lead } from "@/lib/types";
+import { formatMoney, type QuoteRow } from "@/lib/repo/quotes";
+import { LEAD_STATUS_LABELS } from "@/lib/types";
+import { estimateDealValue, lostReasonFor, stageEnteredAt } from "@/lib/dealSignals";
+import { daysSince } from "@/lib/format";
 import { computeReadiness } from "@/lib/readiness";
 import type { QualField } from "@/lib/ai/intelligence";
 import { format } from "date-fns";
@@ -24,6 +27,7 @@ export function LeadHeader({
   focusField,
   canContract,
   quote = null,
+  activities = [],
 }: {
   lead: Lead;
   company: Company;
@@ -36,8 +40,14 @@ export function LeadHeader({
   canContract: boolean;
   /** The active quote, when there is one — it lights the Quote step. */
   quote?: QuoteRow | null;
+  /** The timeline, for "in this stage since" and the lost reason. */
+  activities?: Activity[];
 }) {
   const readiness = computeReadiness(lead, contacts);
+  const closed = lead.status === "won" || lead.status === "lost";
+  const stageDays = daysSince(stageEnteredAt(activities, lead.status, lead.created_at));
+  const estimate = quote || closed ? null : estimateDealValue(lead);
+  const lost = lead.status === "lost" ? lostReasonFor(activities) : null;
   const initials = company.name
     .split(" ")
     .map((p) => p[0])
@@ -58,7 +68,31 @@ export function LeadHeader({
             </Avatar>
             <div>
               <h1 className="text-lg font-semibold text-foreground">{company.name}</h1>
-              <p className="text-xs text-muted-foreground">Created {format(new Date(lead.created_at), "MMM d, yyyy")}</p>
+              <p className="text-xs text-muted-foreground">
+                Created {format(new Date(lead.created_at), "MMM d, yyyy")}
+                <span className="mx-1.5 text-border">·</span>
+                {closed ? (
+                  <>
+                    {LEAD_STATUS_LABELS[lead.status]} {stageDays === 0 ? "today" : `${stageDays}d ago`}
+                    {lost ? <span className="text-destructive"> — {lost.reason}</span> : null}
+                  </>
+                ) : (
+                  <>
+                    In {LEAD_STATUS_LABELS[lead.status]} {stageDays === 0 ? "since today" : `for ${stageDays} day${stageDays === 1 ? "" : "s"}`}
+                  </>
+                )}
+                {quote ? (
+                  <>
+                    <span className="mx-1.5 text-border">·</span>
+                    <span className="font-medium text-foreground tabular-nums">{formatMoney(quote.meta.total)}</span> quoted
+                  </>
+                ) : estimate ? (
+                  <>
+                    <span className="mx-1.5 text-border">·</span>
+                    <span className="tabular-nums" title={`Estimate: ${estimate.basis}. Not a quote.`}>~{formatMoney(estimate.amount)} est.</span>
+                  </>
+                ) : null}
+              </p>
             </div>
           </div>
           <div className="flex flex-wrap items-start gap-3">

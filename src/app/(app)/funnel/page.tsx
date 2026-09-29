@@ -85,7 +85,7 @@ export default async function FunnelPage({ searchParams }: { searchParams: Promi
         <div>
           <h1 className="text-[2rem] font-bold leading-tight tracking-tight text-foreground">Sales Funnel</h1>
           <p className="mt-1 text-[15px] text-muted-foreground">
-            Where customers are in the journey, how many make each step, and where they drop out. To work an individual deal, use the{" "}
+            Understand where customers move, convert and drop out across the sales journey. To work an individual deal, use the{" "}
             <Link href="/pipeline" className="font-medium text-primary hover:underline">
               Pipeline
             </Link>
@@ -98,7 +98,7 @@ export default async function FunnelPage({ searchParams }: { searchParams: Promi
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <KpiTile label="Inquiries" value={String(data.totalInquiries)} sub={describeDateFilter(date)} />
         <KpiTile label="Won" value={String(data.totalWon)} sub={data.overallConversion === null ? "—" : `${percent(data.overallConversion)} inquiry → won`} tone="success" />
-        <KpiTile label="Inquiry to won" value={data.avgCycleDays === null ? "—" : `${data.avgCycleDays}d`} sub="Average, across wins" />
+        <KpiTile label="Avg. time to win" value={data.avgCycleDays === null ? "—" : `${data.avgCycleDays}d`} sub="Inquiry to won, across wins" />
         <KpiTile
           label="Biggest drop-off"
           value={drop ? percent(drop.share) : "—"}
@@ -111,7 +111,7 @@ export default async function FunnelPage({ searchParams }: { searchParams: Promi
         <div className="flex flex-col gap-3 border-b border-border px-6 py-4 sm:flex-row sm:items-center sm:justify-between">
           <p className="flex items-center gap-2 text-[13px] text-muted-foreground">
             <Funnel className="h-4 w-4 text-navy" />
-            Customer journey · each band counts everyone who reached that stage, so the drop between bands is real customers
+            Customer journey · each band is everyone who reached that stage; “dropped” is who never made the next one
           </p>
           <div className="flex flex-wrap items-center gap-2">
             <FunnelFilters owners={data.options.owners} industries={data.options.industries} sources={data.options.sources} />

@@ -1,14 +1,13 @@
 import Link from "next/link";
-import { Funnel, TrendingDown } from "lucide-react";
+import { Funnel } from "lucide-react";
 import { loadFunnel, FUNNEL_STAGES, type FunnelStage } from "@/lib/repo/funnel";
 import { parseDateFilter, describeDateFilter } from "@/lib/dashboard";
-import { compactMoney, percent } from "@/lib/repo/metrics";
+import { percent } from "@/lib/repo/metrics";
 import { KpiTile } from "@/components/reports/charts";
 import { FunnelChart } from "@/components/funnel/funnel-chart";
 import { FunnelFilters } from "@/components/funnel/funnel-filters";
 import { DateRangeField } from "@/components/dashboard/date-range-field";
 import { FunnelCustomers } from "@/components/funnel/funnel-customers";
-import { cn } from "@/lib/utils";
 
 /**
  * Sales Funnel — the analytical view beside the Pipeline.
@@ -20,7 +19,6 @@ import { cn } from "@/lib/utils";
  * number open below the chart, on the same page.
  */
 const STAGE_KEYS = new Set<string>(FUNNEL_STAGES.map((s) => s.key));
-type Show = "reached" | "here" | "moved" | "lost";
 
 export default async function FunnelPage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
   const params = await searchParams;
@@ -29,7 +27,6 @@ export default async function FunnelPage({ searchParams }: { searchParams: Promi
   const industry = typeof params.industry === "string" && params.industry ? params.industry : null;
   const source = typeof params.source === "string" && params.source ? params.source : null;
   const stage = typeof params.stage === "string" && STAGE_KEYS.has(params.stage) ? (params.stage as FunnelStage) : null;
-  const show: Show = params.show === "here" || params.show === "moved" || params.show === "lost" ? params.show : "reached";
 
   const data = await loadFunnel({ date, ownerId, industry, source });
 
@@ -55,11 +52,7 @@ export default async function FunnelPage({ searchParams }: { searchParams: Promi
   const behind = stage
     ? data.leads.filter((l) => {
         const reached = rank(l.furthest) >= rank(stage);
-        if (!reached) return false;
-        if (show === "here") return l.current === stage;
-        if (show === "moved") return !l.lost && rank(l.furthest) > rank(stage);
-        if (show === "lost") return l.lost && l.furthest === stage;
-        return true;
+        return reached;
       })
     : [];
   const counts = stage
@@ -72,6 +65,7 @@ export default async function FunnelPage({ searchParams }: { searchParams: Promi
     : null;
   const sorted = [...behind].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
   const stageStats = stage ? data.stages.find((s) => s.key === stage) : null;
+  const nextStage = stage ? data.stages[data.stages.findIndex((s) => s.key === stage) + 1] ?? null : null;
   const filtersOn = Boolean(ownerId || industry || source || date.range !== "all");
   const drop = data.biggestDrop;
   const dropFrom = drop ? FUNNEL_STAGES.find((s) => s.key === drop.from)?.label : null;
@@ -139,47 +133,27 @@ export default async function FunnelPage({ searchParams }: { searchParams: Promi
         </div>
       </section>
 
-      {/* Stage detail — the customers behind the number, on the same page. */}
+      {/* Stage performance, then the customers as evidence. */}
       {stage && stageStats && (
         <section id="stage" className="mt-4 overflow-hidden rounded-[var(--radius)] border border-border bg-card card-shadow">
-          <div className="flex flex-col gap-3 border-b border-border px-6 py-4 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex flex-col gap-3 border-b border-border px-6 py-4 sm:flex-row sm:items-start sm:justify-between">
             <div>
               <h2 className="text-[16px] font-semibold text-foreground">
-                {stageStats.label} — {stageStats.reached} customer{stageStats.reached === 1 ? "" : "s"}
+                {stageStats.label} — {stageStats.reached} customer{stageStats.reached === 1 ? "" : "s"} reached this stage
               </h2>
+              <p className="mt-1 text-[13px] text-foreground">
+                <span className="font-medium tabular-nums">{counts?.moved ?? 0}</span> moved forward · <span className="font-medium tabular-nums">{stageStats.lostHere}</span> lost ·{" "}
+                <span className="font-medium tabular-nums">{stageStats.here}</span> still in this stage
+              </p>
               <p className="mt-0.5 text-[12.5px] text-muted-foreground">
-                {stageStats.here} here now{stageStats.avgDaysHere !== null ? ` (avg ${stageStats.avgDaysHere}d so far)` : ""}
-                {stageStats.hereValue > 0 ? ` · ${compactMoney(stageStats.hereValue)} ${stageStats.hereQuoted < stageStats.here ? "quoted + estimated" : "quoted"}` : ""}
-                {stageStats.movedOn > 0 && stageStats.avgDays !== null ? ` · ${stageStats.movedOn} moved on after ${stageStats.avgDays}d on average` : ""}
-                {stageStats.lostHere > 0 ? ` · ${stageStats.lostHere} lost at this stage` : ""}
+                {stageStats.avgDays !== null ? `Average time in stage: ${stageStats.avgDays} days` : "Average time in stage: —"}
+                {nextStage ? ` · Conversion to ${nextStage.label}: ${stageStats.reached ? percent(nextStage.reached / stageStats.reached) : "—"}` : ""}
+                {stageStats.avgDaysHere !== null && stageStats.here > 0 ? ` · Those still here have waited ${stageStats.avgDaysHere} days on average` : ""}
               </p>
             </div>
-            <div className="flex flex-wrap items-center gap-1.5">
-              {(
-                [
-                  { key: "reached", label: "All who reached", n: counts?.reached ?? 0 },
-                  { key: "here", label: "Here now", n: counts?.here ?? 0 },
-                  { key: "moved", label: "Moved on", n: counts?.moved ?? 0 },
-                  { key: "lost", label: "Lost here", n: counts?.lost ?? 0 },
-                ] as { key: Show; label: string; n: number }[]
-              ).map((t) => (
-                <Link
-                  key={t.key}
-                  href={href({ stage, show: t.key === "reached" ? null : t.key })}
-                  scroll={false}
-                  className={cn(
-                    "inline-flex items-center gap-1.5 rounded-md px-2.5 py-1 text-[13px] font-medium transition-colors",
-                    show === t.key ? (t.key === "lost" ? "bg-destructive text-white" : "bg-navy text-white") : "text-muted-foreground hover:bg-muted hover:text-foreground"
-                  )}
-                >
-                  {t.key === "lost" && <TrendingDown className="h-3.5 w-3.5" />}
-                  {t.label} <span className={cn("tabular-nums", show === t.key ? "text-white/80" : "text-muted-foreground/70")}>{t.n}</span>
-                </Link>
-              ))}
-              <Link href={href({ stage: null, show: null })} scroll={false} className="ml-1 text-[12px] text-muted-foreground hover:text-foreground" aria-label="Close stage detail">
-                ×
-              </Link>
-            </div>
+            <Link href={href({ stage: null, show: null })} scroll={false} className="text-[12px] text-muted-foreground hover:text-foreground" aria-label="Close stage detail">
+              Close ×
+            </Link>
           </div>
           <FunnelCustomers leads={sorted} stage={stage} now={data.now} />
         </section>

@@ -23,7 +23,7 @@ export const FUNNEL_STAGES: { key: FunnelStage; label: string; describe: string 
   { key: "discovery", label: "Discovery", describe: "A discovery call was booked or held" },
   { key: "qualified", label: "Qualified", describe: "Need, users, decision maker, timeline and budget confirmed" },
   { key: "quote_ready", label: "Quote Ready", describe: `Quoted, or marked ${DOWNSTREAM.name}` },
-  { key: "won", label: "Won", describe: "Closed-won" },
+  { key: "won", label: "Won", describe: "Closed-won — hands off to contract, e-signature and onboarding" },
 ];
 const RANK: Record<FunnelStage, number> = { inquiry: 0, contacted: 1, discovery: 2, qualified: 3, quote_ready: 4, won: 5 };
 const STATUS_STAGE: Record<LeadStatus, FunnelStage | null> = { new: "inquiry", contacted: "contacted", qualified: "qualified", quoted: "quote_ready", won: "won", lost: null };

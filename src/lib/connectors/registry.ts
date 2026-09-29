@@ -2,7 +2,8 @@ import { SALES_TOOLS } from "@/lib/ai/salesTools";
 import { emailProvider } from "@/lib/email/provider";
 import { getSetting, setSetting } from "@/lib/repo/settings";
 import { probeMcpServer } from "@/lib/connectors/mcpClient";
-import type { ConnectorInfo, ConnectorStatus, ConnectorToolInfo, CustomServer, WorkflowNode } from "@/lib/connectors/types";
+import { CONNECT_SPECS, connectSpec, getConnection, type SavedConnection } from "@/lib/connectors/connect";
+import type { ConnectionInfo, ConnectorInfo, ConnectorLayer, ConnectorStatus, ConnectorToolInfo, CustomServer, WorkflowNode } from "@/lib/connectors/types";
 
 /**
  * The connector registry — one place that knows which external systems the
@@ -16,11 +17,19 @@ import type { ConnectorInfo, ConnectorStatus, ConnectorToolInfo, CustomServer, W
  * the AI already runs on (lib/ai/salesTools.ts) and the same list the
  * /api/mcp endpoint serves.
  */
-const env = (k: string) => Boolean(process.env[k]?.trim());
+/**
+ * A value is "present" when it is set in the environment or was saved by
+ * connecting from inside the app (verified against the vendor first).
+ * The environment wins so a deployment can pin credentials.
+ */
+type Saved = Record<string, SavedConnection | null>;
+let currentSaved: Saved = {};
+const env = (k: string) => Boolean(process.env[k]?.trim()) || Object.values(currentSaved).some((c) => c?.values[k]?.trim());
 const envRow = (keys: string[]) => keys.map((key) => ({ key, present: env(key) }));
 
 interface BuiltIn {
   key: string;
+  layer: ConnectorLayer;
   name: string;
   vendor: string;
   category: ConnectorInfo["category"];
@@ -32,11 +41,18 @@ interface BuiltIn {
   status: () => Promise<ConnectorStatus>;
 }
 
+/** "Connected as <account> · verified <date>" when connected from the app, else the env wording. */
+const accountLine = (key: string, envWording: string) => {
+  const c = currentSaved[key];
+  return c ? `Connected as ${c.account ?? "verified account"} · verified ${new Date(c.verifiedAt).toLocaleDateString("en-US", { month: "short", day: "numeric" })}` : envWording;
+};
+
 const tool = (name: string, description: string, kind: ConnectorToolInfo["kind"], inputs: string[] = []): ConnectorToolInfo => ({ name, description, kind, inputs });
 
 const BUILT_INS: BuiltIn[] = [
   {
     key: "sales_engine",
+    layer: "mcp",
     name: "Experience.com Sales Engine",
     vendor: "Experience.com",
     category: "internal",
@@ -55,10 +71,11 @@ const BUILT_INS: BuiltIn[] = [
   },
   {
     key: "email",
-    name: "Email delivery",
+    layer: "native",
+    name: "Email / SMTP",
     vendor: "Resend",
     category: "email",
-    description: "Sends the messages the AI drafts and a person approves. In development the provider records messages instead of delivering them.",
+    description: "The Sales Engine's own outbound email service (Resend) — sends the messages the AI drafts and a person approves. In development the provider records messages instead of delivering them.",
     usedBy: ["AI Actions — approve & send", "Approvals queue", "Quote emails"],
     tools: [tool("create_email_draft", "Draft an email to a contact, grounded in the opportunity record", "draft", ["lead_id", "contact_id", "intent"]), tool("send_email", "Send an approved email to a contact", "request", ["to", "subject", "body"])],
     requiredEnv: ["EMAIL_PROVIDER", "RESEND_API_KEY", "EMAIL_FROM"],
@@ -74,6 +91,7 @@ const BUILT_INS: BuiltIn[] = [
   },
   {
     key: "gmail",
+    layer: "native",
     name: "Gmail",
     vendor: "Google",
     category: "email",
@@ -85,11 +103,12 @@ const BUILT_INS: BuiltIn[] = [
     async status() {
       const keys = ["GMAIL_OAUTH_CLIENT_ID", "GMAIL_OAUTH_CLIENT_SECRET", "GMAIL_REFRESH_TOKEN"];
       const missing = keys.filter((k) => !env(k));
-      return { state: missing.length ? "not_connected" : "connected", detail: missing.length ? `Not connected — missing ${missing.join(", ")}.` : "OAuth credentials present.", env: envRow(keys) };
+      return { state: missing.length ? "not_connected" : "connected", detail: missing.length ? `Not connected — missing ${missing.join(", ")}.` : accountLine("gmail", "OAuth credentials present."), env: envRow(keys) };
     },
   },
   {
     key: "google_calendar",
+    layer: "native",
     name: "Google Calendar",
     vendor: "Google",
     category: "calendar",
@@ -112,6 +131,7 @@ const BUILT_INS: BuiltIn[] = [
   },
   {
     key: "slack",
+    layer: "mcp",
     name: "Slack",
     vendor: "Slack",
     category: "messaging",
@@ -123,11 +143,12 @@ const BUILT_INS: BuiltIn[] = [
     async status() {
       const keys = ["SLACK_BOT_TOKEN", "SLACK_DEFAULT_CHANNEL"];
       const missing = keys.filter((k) => !env(k));
-      return { state: missing.length ? "not_connected" : "connected", detail: missing.length ? `Not connected — missing ${missing.join(", ")}.` : "Bot token present.", env: envRow(keys) };
+      return { state: missing.length ? "not_connected" : "connected", detail: missing.length ? `Not connected — missing ${missing.join(", ")}.` : accountLine("slack", "Bot token present."), env: envRow(keys) };
     },
   },
   {
     key: "salesforce",
+    layer: "mcp",
     name: "Salesforce",
     vendor: "Salesforce",
     category: "crm",
@@ -139,11 +160,12 @@ const BUILT_INS: BuiltIn[] = [
     async status() {
       const keys = ["SALESFORCE_INSTANCE_URL", "SALESFORCE_CLIENT_ID", "SALESFORCE_CLIENT_SECRET", "SALESFORCE_REFRESH_TOKEN"];
       const missing = keys.filter((k) => !env(k));
-      return { state: missing.length ? "not_connected" : "connected", detail: missing.length ? `Not connected — missing ${missing.join(", ")}.` : "Connected app credentials present.", env: envRow(keys) };
+      return { state: missing.length ? "not_connected" : "connected", detail: missing.length ? `Not connected — missing ${missing.join(", ")}.` : accountLine("salesforce", "Connected app credentials present."), env: envRow(keys) };
     },
   },
   {
     key: "hubspot",
+    layer: "mcp",
     name: "HubSpot",
     vendor: "HubSpot",
     category: "crm",
@@ -154,7 +176,7 @@ const BUILT_INS: BuiltIn[] = [
     docsUrl: "https://developers.hubspot.com/docs/api/private-apps",
     async status() {
       const ok = env("HUBSPOT_ACCESS_TOKEN");
-      return { state: ok ? "connected" : "not_connected", detail: ok ? "Private app token present." : "Not connected — set HUBSPOT_ACCESS_TOKEN (private app).", env: envRow(["HUBSPOT_ACCESS_TOKEN"]) };
+      return { state: ok ? "connected" : "not_connected", detail: ok ? accountLine("hubspot", "Private app token present.") : "Not connected — set HUBSPOT_ACCESS_TOKEN (private app) or connect from the app.", env: envRow(["HUBSPOT_ACCESS_TOKEN"]) };
     },
   },
 ];
@@ -193,13 +215,18 @@ export async function testCustomServer(id: string): Promise<CustomServer | null>
 /* ---------------------------------------------------------------- reads */
 
 export async function listConnectors(): Promise<ConnectorInfo[]> {
-  const [disabled, custom] = await Promise.all([disabledConnectors(), customServers()]);
+  const [disabled, custom, ...saved] = await Promise.all([disabledConnectors(), customServers(), ...Object.keys(CONNECT_SPECS).map((k) => getConnection(k).then((c) => [k, c] as const))]);
+  currentSaved = Object.fromEntries(saved);
   const builtIns = await Promise.all(
     BUILT_INS.map(async (b) => {
       const status = await b.status();
       const enabled = !disabled.includes(b.key);
+      const fromEnv = b.requiredEnv.every((k) => Boolean(process.env[k]?.trim()));
+      const savedConn = currentSaved[b.key] ?? null;
+      const connection: ConnectionInfo | undefined = status.state === "connected" ? (fromEnv || !savedConn ? { source: "env", account: null, verifiedAt: null } : { source: "saved", account: savedConn.account, verifiedAt: savedConn.verifiedAt }) : undefined;
       return {
         key: b.key,
+        layer: b.layer,
         name: b.name,
         vendor: b.vendor,
         category: b.category,
@@ -210,6 +237,8 @@ export async function listConnectors(): Promise<ConnectorInfo[]> {
         enabled,
         custom: false,
         docsUrl: b.docsUrl,
+        connect: connectSpec(b.key),
+        connection,
       } satisfies ConnectorInfo;
     })
   );
@@ -225,6 +254,7 @@ export async function listConnectors(): Promise<ConnectorInfo[]> {
     void ok;
     return {
       key: c.id,
+      layer: "mcp",
       name: c.name,
       vendor: c.serverName ?? "Custom MCP server",
       category: "custom",

@@ -7,6 +7,7 @@ import { headers } from "next/headers";
 import { customServers, listConnectors, saveCustomServers, setConnectorEnabled, testCustomServer, workflowNodes } from "@/lib/connectors/registry";
 import type { ConnectorInfo, WorkflowNode } from "@/lib/connectors/types";
 import { probeMcpServer } from "@/lib/connectors/mcpClient";
+import { CONNECT_SPECS, clearConnection, getConnection, saveConnection } from "@/lib/connectors/connect";
 import { settingsAvailable } from "@/lib/repo/settings";
 
 export interface ConnectorActionResult {
@@ -91,4 +92,63 @@ export async function probeServerAction(url: string, bearerToken?: string | null
   return probe.ok
     ? { ok: true, detail: `${probe.serverName ?? "Server"} answered in ${probe.latencyMs} ms · MCP ${probe.protocolVersion ?? "?"} · ${probe.tools.length} tools`, tools: probe.tools.map((t) => ({ name: t.name, description: t.description })) }
     : { ok: false, detail: probe.error ?? "No answer.", tools: [] };
+}
+
+/* ---------------------------------------------------- connect from the app */
+
+/**
+ * Connect a built-in connector with credentials entered in the app. The
+ * vendor is asked first (a real API call); only a passing check is saved.
+ */
+export async function connectConnectorAction(key: string, values: Record<string, string>): Promise<ConnectorActionResult & { account?: string | null }> {
+  const user = await getCurrentUser();
+  if (!user) return { ok: false, detail: "Sign in first." };
+  const spec = CONNECT_SPECS[key];
+  if (!spec) return { ok: false, detail: "This connector is configured through the environment, not from the app." };
+  if (!(await settingsAvailable())) return { ok: false, detail: "The app_settings table does not exist yet — run `npm run db:schema`." };
+  const clean: Record<string, string> = {};
+  for (const f of spec.fields) {
+    const v = (values[f.key] ?? "").trim();
+    if (!v) return { ok: false, detail: `${f.label} is required.` };
+    clean[f.key] = v;
+  }
+  let result;
+  try {
+    result = await spec.verify(clean);
+  } catch (e) {
+    return { ok: false, detail: `Could not reach the vendor: ${e instanceof Error ? e.message : String(e)}` };
+  }
+  if (!result.ok) return { ok: false, detail: result.error ?? "The vendor rejected these credentials." };
+  const saved = await saveConnection(key, { values: clean, account: result.account, verifiedAt: new Date().toISOString() });
+  if (!saved.ok) return { ok: false, detail: saved.detail ?? "Could not save." };
+  revalidatePath("/connectors");
+  return { ok: true, detail: `Connected as ${result.account ?? "verified account"}.`, account: result.account };
+}
+
+/** Ask the vendor again with the saved credentials; updates the verified time or reports what broke. */
+export async function verifyConnectorAction(key: string): Promise<ConnectorActionResult> {
+  const user = await getCurrentUser();
+  if (!user) return { ok: false, detail: "Sign in first." };
+  const spec = CONNECT_SPECS[key];
+  const saved = await getConnection(key);
+  if (!spec || !saved) return { ok: false, detail: "Nothing saved for this connector — it is configured through the environment." };
+  try {
+    const r = await spec.verify(saved.values);
+    if (!r.ok) return { ok: false, detail: r.error ?? "The vendor rejected the saved credentials." };
+    await saveConnection(key, { ...saved, account: r.account, verifiedAt: new Date().toISOString() });
+    revalidatePath("/connectors");
+    return { ok: true, detail: `Still connected as ${r.account ?? "verified account"}.` };
+  } catch (e) {
+    return { ok: false, detail: `Could not reach the vendor: ${e instanceof Error ? e.message : String(e)}` };
+  }
+}
+
+/** Forget credentials saved from the app. Environment variables are untouched. */
+export async function disconnectConnectorAction(key: string): Promise<ConnectorActionResult> {
+  const user = await getCurrentUser();
+  if (!user) return { ok: false, detail: "Sign in first." };
+  const r = await clearConnection(key);
+  if (!r.ok) return { ok: false, detail: r.detail ?? "Could not disconnect." };
+  revalidatePath("/connectors");
+  return { ok: true, detail: "Disconnected — saved credentials removed." };
 }

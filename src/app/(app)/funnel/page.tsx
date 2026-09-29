@@ -55,12 +55,16 @@ export default async function FunnelPage({ searchParams }: { searchParams: Promi
         return reached;
       })
     : [];
+  // One identity holds for every stage: reached = moved to next + lost here + still here.
   const counts = stage
     ? {
         reached: data.leads.filter((l) => rank(l.furthest) >= rank(stage)).length,
-        here: data.leads.filter((l) => l.current === stage).length,
-        moved: data.leads.filter((l) => !l.lost && rank(l.furthest) > rank(stage)).length,
-        lost: data.leads.filter((l) => l.lost && l.furthest === stage).length,
+        movedNext: data.leads.filter((l) => rank(l.furthest) > rank(stage)).length,
+        lostHere: data.leads.filter((l) => l.lost && l.furthest === stage).length,
+        stillHere: data.leads.filter((l) => !l.lost && l.current === stage).length,
+        won: data.leads.filter((l) => rank(l.furthest) > rank(stage) && l.status === "won").length,
+        lostLater: data.leads.filter((l) => rank(l.furthest) > rank(stage) && l.lost).length,
+        inJourney: data.leads.filter((l) => rank(l.furthest) > rank(stage) && !l.lost && l.status !== "won").length,
       }
     : null;
   const sorted = [...behind].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
@@ -142,14 +146,24 @@ export default async function FunnelPage({ searchParams }: { searchParams: Promi
                 {stageStats.label} — {stageStats.reached} customer{stageStats.reached === 1 ? "" : "s"} reached this stage
               </h2>
               <p className="mt-1 text-[13px] text-foreground">
-                <span className="font-medium tabular-nums">{counts?.moved ?? 0}</span> moved forward · <span className="font-medium tabular-nums">{stageStats.lostHere}</span> lost ·{" "}
-                <span className="font-medium tabular-nums">{stageStats.here}</span> still in this stage
+                {nextStage ? (
+                  <>
+                    <span className="font-medium tabular-nums">{counts?.movedNext ?? 0}</span> moved to {nextStage.label} ·{" "}
+                  </>
+                ) : null}
+                <span className="font-medium tabular-nums">{counts?.lostHere ?? 0}</span> lost here · <span className="font-medium tabular-nums">{counts?.stillHere ?? 0}</span> still in this stage
               </p>
               <p className="mt-0.5 text-[12.5px] text-muted-foreground">
+                {nextStage ? `Conversion to ${nextStage.label}: ${stageStats.reached ? percent(nextStage.reached / stageStats.reached) : "—"} · ` : ""}
                 {stageStats.avgDays !== null ? `Average time in stage: ${stageStats.avgDays} days` : "Average time in stage: —"}
-                {nextStage ? ` · Conversion to ${nextStage.label}: ${stageStats.reached ? percent(nextStage.reached / stageStats.reached) : "—"}` : ""}
                 {stageStats.avgDaysHere !== null && stageStats.here > 0 ? ` · Those still here have waited ${stageStats.avgDaysHere} days on average` : ""}
               </p>
+              {nextStage && (counts?.movedNext ?? 0) > 0 && (
+                <p className="mt-0.5 text-[12.5px] text-muted-foreground">
+                  Of those who moved on: <span className="tabular-nums text-foreground">{counts?.won}</span> won · <span className="tabular-nums text-foreground">{counts?.lostLater}</span> lost later ·{" "}
+                  <span className="tabular-nums text-foreground">{counts?.inJourney}</span> still in the journey
+                </p>
+              )}
             </div>
             <Link href={href({ stage: null, show: null })} scroll={false} className="text-[12px] text-muted-foreground hover:text-foreground" aria-label="Close stage detail">
               Close ×

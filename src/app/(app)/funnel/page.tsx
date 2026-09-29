@@ -1,14 +1,13 @@
 import Link from "next/link";
 import { Funnel, TrendingDown } from "lucide-react";
 import { loadFunnel, FUNNEL_STAGES, type FunnelStage } from "@/lib/repo/funnel";
-import { listLeadRows } from "@/lib/repo/leads";
 import { parseDateFilter, describeDateFilter } from "@/lib/dashboard";
 import { compactMoney, percent } from "@/lib/repo/metrics";
 import { KpiTile } from "@/components/reports/charts";
 import { FunnelChart } from "@/components/funnel/funnel-chart";
 import { FunnelFilters } from "@/components/funnel/funnel-filters";
 import { DateRangeField } from "@/components/dashboard/date-range-field";
-import { LeadsTable } from "@/components/dashboard/leads-table";
+import { FunnelCustomers } from "@/components/funnel/funnel-customers";
 import { cn } from "@/lib/utils";
 
 /**
@@ -71,8 +70,7 @@ export default async function FunnelPage({ searchParams }: { searchParams: Promi
         lost: data.leads.filter((l) => l.lost && l.furthest === stage).length,
       }
     : null;
-  const ids = new Set(behind.map((l) => l.id));
-  const rows = stage ? (await listLeadRows()).filter((r) => ids.has(r.id)) : [];
+  const sorted = [...behind].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
   const stageStats = stage ? data.stages.find((s) => s.key === stage) : null;
   const filtersOn = Boolean(ownerId || industry || source || date.range !== "all");
   const drop = data.biggestDrop;
@@ -85,7 +83,7 @@ export default async function FunnelPage({ searchParams }: { searchParams: Promi
         <div>
           <h1 className="text-[2rem] font-bold leading-tight tracking-tight text-foreground">Sales Funnel</h1>
           <p className="mt-1 text-[15px] text-muted-foreground">
-            Understand where customers move, convert and drop out across the sales journey. To work an individual deal, use the{" "}
+            Understand how customers move, convert, and drop out across the sales journey. To work an individual deal, use the{" "}
             <Link href="/pipeline" className="font-medium text-primary hover:underline">
               Pipeline
             </Link>
@@ -147,7 +145,7 @@ export default async function FunnelPage({ searchParams }: { searchParams: Promi
           <div className="flex flex-col gap-3 border-b border-border px-6 py-4 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <h2 className="text-[16px] font-semibold text-foreground">
-                {stageStats.label} · {stageStats.reached} customer{stageStats.reached === 1 ? "" : "s"} reached this stage
+                {stageStats.label} — {stageStats.reached} customer{stageStats.reached === 1 ? "" : "s"}
               </h2>
               <p className="mt-0.5 text-[12.5px] text-muted-foreground">
                 {stageStats.here} here now{stageStats.avgDaysHere !== null ? ` (avg ${stageStats.avgDaysHere}d so far)` : ""}
@@ -183,7 +181,7 @@ export default async function FunnelPage({ searchParams }: { searchParams: Promi
               </Link>
             </div>
           </div>
-          <LeadsTable rows={rows} />
+          <FunnelCustomers leads={sorted} stage={stage} now={data.now} />
         </section>
       )}
     </div>

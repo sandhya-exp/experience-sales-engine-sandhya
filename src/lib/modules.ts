@@ -31,6 +31,6 @@ export const DOWNSTREAM = {
   navLabel: STAGE,
   /** Heading for the readiness checklist. */
   readinessLabel: "Contract readiness",
-  /** Where "Ready to Contract" leads inside this app: its own pipeline stage. */
-  route: "/pipeline?stage=quoted",
+  /** Where "Ready to Contract" leads inside this app: the handoff page (status per deal, door into the contract module). */
+  route: "/contract",
 } as const;

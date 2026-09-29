@@ -2,7 +2,6 @@ import Link from "next/link";
 import { cn } from "@/lib/utils";
 import { percent } from "@/lib/repo/metrics";
 import type { FunnelStage, FunnelStageStats } from "@/lib/repo/funnel";
-import { DOWNSTREAM } from "@/lib/modules";
 
 /**
  * The customer journey as a funnel. One band per stage, narrowing with the
@@ -51,7 +50,7 @@ export function FunnelChart({ stages, selected, href }: { stages: FunnelStageSta
                       )}
                     </>
                   ) : (
-                    <>Closed-won · continues to contract, e-signature and onboarding in {DOWNSTREAM.partner}</>
+                    <>Closed-won · continues to contract, e-signature and onboarding</>
                   )}
                 </p>
               </div>

@@ -105,3 +105,39 @@ export async function listCompanyRows(): Promise<CompanyRow[]> {
     order by co.created_at desc
   `);
 }
+
+
+/** Company lookups for the import planner and the "Add from existing company" picker. */
+export async function findCompanyByDomain(domain: string): Promise<Company | null> {
+  return queryOne<Company>("select * from companies where domain = $1", [domain.toLowerCase().trim()]);
+}
+
+export async function findCompanyByName(name: string): Promise<Company | null> {
+  const n = name.trim();
+  if (!n) return null;
+  return queryOne<Company>("select * from companies where lower(name) = lower($1) order by created_at asc limit 1", [n]);
+}
+
+export interface CompanySearchRow extends Company {
+  contact_count: number;
+  latest_lead_id: string | null;
+}
+
+export async function searchCompanies(q: string, limit = 8): Promise<CompanySearchRow[]> {
+  const term = `%${q.trim()}%`;
+  return query<CompanySearchRow>(
+    `select co.*,
+            (select count(*)::int from contacts ct where ct.company_id = co.id) as contact_count,
+            (select l.id from leads l where l.company_id = co.id order by l.created_at desc limit 1) as latest_lead_id
+       from companies co
+      where $1 = '%%' or co.name ilike $1 or co.domain ilike $1
+      order by co.name asc
+      limit $2`,
+    [term, limit]
+  );
+}
+
+export async function createCompany(name: string, domain: string | null, industry: string | null = null): Promise<Company> {
+  const created = await queryOne<Company>(`insert into companies (name, domain, industry) values ($1, $2, $3) returning *`, [name.trim(), domain, industry]);
+  return created as Company;
+}

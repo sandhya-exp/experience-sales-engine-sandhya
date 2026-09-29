@@ -3,6 +3,7 @@ import { listTeam } from "@/lib/repo/users";
 import { assignLeadOwner } from "@/lib/repo/leads";
 import { findOrCreateCompanyForEmail } from "@/lib/repo/companies";
 import { findOrCreateContactForInquiry } from "@/lib/repo/contacts";
+import { sourceForChannel } from "@/lib/contacts/source";
 import { createLead } from "@/lib/repo/leads";
 import { scheduleRefresh } from "@/lib/ai/background";
 
@@ -17,7 +18,8 @@ export { InquiryInput, TalkToSalesInput } from "@/lib/inquiry-schema";
 
 export async function createInquiryLead(data: InquiryInputType, source: string) {
   const { company, matched } = await findOrCreateCompanyForEmail(data.companyName, data.workEmail, data.industry ?? null);
-  const contact = await findOrCreateContactForInquiry(company.id, data.contactName, data.workEmail, data.phone ?? null);
+  // Create or update the contact from what the customer typed — the rep never re-enters it.
+  const contact = await findOrCreateContactForInquiry(company.id, data.contactName, data.workEmail, data.phone ?? null, sourceForChannel(source));
   const lead = await createLead({
     companyId: company.id,
     primaryContactId: contact.id,

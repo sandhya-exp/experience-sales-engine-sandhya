@@ -2,6 +2,8 @@ import Link from "next/link";
 import { Building2, Search, Users, ArrowRight } from "lucide-react";
 import { listCompanyRows } from "@/lib/repo/companies";
 import { listLeadRows } from "@/lib/repo/leads";
+import { listTeam } from "@/lib/repo/users";
+import { AddContactMenu } from "@/components/contacts/add-contact-menu";
 import { LEAD_STATUS_LABELS, type LeadStatus } from "@/lib/types";
 import { StageBadge } from "@/components/dashboard/leads-table";
 import { formatActivityTime } from "@/lib/format";
@@ -23,7 +25,7 @@ export default async function CompaniesPage({ searchParams }: PageProps<"/compan
   const industry = typeof params.industry === "string" ? params.industry : "";
   const filter = typeof params.filter === "string" ? params.filter : "all"; // all | customers | prospects
 
-  const [companies, leads] = await Promise.all([listCompanyRows(), listLeadRows()]);
+  const [companies, leads, team] = await Promise.all([listCompanyRows(), listLeadRows(), listTeam()]);
   const leadsByCompany = new Map<string, typeof leads>();
   for (const l of leads) {
     const list = leadsByCompany.get(l.company_id) ?? [];
@@ -62,11 +64,15 @@ export default async function CompaniesPage({ searchParams }: PageProps<"/compan
 
   return (
     <div className="mx-auto max-w-7xl px-6 pb-12 pt-8">
-      <div className="mb-6">
-        <h1 className="text-[2rem] font-bold leading-tight tracking-tight text-foreground">Companies</h1>
-        <p className="mt-1 text-[15px] text-muted-foreground">
-          Every customer and prospect on record, with their contacts and opportunities. Check here before adding an account — a new inquiry from a known domain joins the account that already exists.
-        </p>
+      <div className="mb-6 flex flex-wrap items-end justify-between gap-4">
+        <div>
+          <h1 className="text-[2rem] font-bold leading-tight tracking-tight text-foreground">Companies</h1>
+          <p className="mt-1 text-[15px] text-muted-foreground">
+            Every customer and prospect on record, with their contacts and opportunities. Check here before adding an account — a new inquiry from a known domain joins the account that already exists.
+          </p>
+        </div>
+        {/* Contacts arrive here too: by hand, from a CSV, onto an existing account, or from a connected source. */}
+        <AddContactMenu team={team.map((m) => ({ id: m.id, name: m.name }))} size="default" variant="navy" />
       </div>
 
       <section className="overflow-hidden rounded-[var(--radius)] border border-border bg-card card-shadow">

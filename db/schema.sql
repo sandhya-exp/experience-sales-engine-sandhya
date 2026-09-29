@@ -155,3 +155,10 @@ create trigger leads_set_updated_at before update on leads
 -- implications, gaps, next action, quote context) alongside the flat brief
 -- columns. Idempotent — safe to re-run `npm run db:schema`.
 alter table ai_deal_briefs add column if not exists intelligence jsonb not null default '{}'::jsonb;
+
+-- Contact provenance: where a contact record came from (talk_to_sales, manual,
+-- csv_import, existing_company, external_crm, api) and, for an external CRM,
+-- its id there. Idempotent — safe to re-run `npm run db:schema`. The code
+-- checks for these columns and works without them until this has been applied.
+alter table contacts add column if not exists source text;
+alter table contacts add column if not exists external_ref text;

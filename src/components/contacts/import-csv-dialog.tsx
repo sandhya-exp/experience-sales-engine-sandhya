@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
 import { CONTACT_FIELD_LABELS, parseCsv, SAMPLE_CSV, suggestMapping, type ContactField } from "@/lib/contacts/csv";
+import { Checkbox } from "@/components/ui/checkbox";
 import { commitCsvImportAction, planCsvImportAction, type ImportPlan, type ImportResult, type PlannedRow } from "@/app/actions/contacts";
 import { ImportReview } from "@/components/contacts/import-review";
 
@@ -38,6 +39,7 @@ export function ImportCsvDialog({ open, onOpenChange, companyId, companyName, le
   const [plan, setPlan] = useState<ImportPlan | null>(null);
   const [result, setResult] = useState<ImportResult | null>(null);
   const [busy, setBusy] = useState(false);
+  const [createLeads, setCreateLeads] = useState(true);
   const fileRef = useRef<HTMLInputElement>(null);
 
   const reset = () => {
@@ -88,7 +90,7 @@ export function ImportCsvDialog({ open, onOpenChange, companyId, companyName, le
     if (!plan) return;
     setBusy(true);
     try {
-      const r = await commitCsvImportAction(plan.rows, "csv_import", leadId ?? null);
+      const r = await commitCsvImportAction(plan.rows, "csv_import", leadId ?? null, { createLeads: !companyId && createLeads });
       setResult(r);
       setStep("done");
       if (r.ok) toast.success(r.detail);
@@ -216,6 +218,19 @@ export function ImportCsvDialog({ open, onOpenChange, companyId, companyName, le
         {step === "review" && plan && (
           <div className="space-y-3">
             <ImportReview plan={plan} onChange={(rowsNext: PlannedRow[]) => setPlan({ ...plan, rows: rowsNext })} />
+            {!companyId && plan.summary.leadCandidates > 0 && (
+              <label className="flex cursor-pointer items-start gap-3 rounded-lg border border-border bg-muted/30 px-4 py-3">
+                <Checkbox checked={createLeads} onCheckedChange={(v) => setCreateLeads(Boolean(v))} className="mt-0.5" />
+                <span className="text-[13px]">
+                  <span className="font-medium text-foreground">
+                    Also create a New Lead for each company without an open opportunity ({plan.summary.leadCandidates})
+                  </span>
+                  <span className="mt-0.5 block text-[12.5px] text-muted-foreground">
+                    Each lead appears under New Leads in the Sales Pipeline, tagged &ldquo;CSV import&rdquo;, using the Number of Users, Interested In and Notes columns when mapped. Companies that already have an open deal are left as they are.
+                  </span>
+                </span>
+              </label>
+            )}
             <div className="flex justify-between">
               <Button variant="ghost" onClick={() => setStep("map")}>
                 Back to mapping
@@ -238,6 +253,7 @@ export function ImportCsvDialog({ open, onOpenChange, companyId, companyName, le
                   <Stat n={result.updated} label="updated" />
                   <Stat n={result.companiesCreated} label="new companies" />
                   <Stat n={result.skipped} label="left out" />
+                  {result.leadsCreated > 0 && <Stat n={result.leadsCreated} label="new leads" />}
                 </dl>
               )}
             </div>

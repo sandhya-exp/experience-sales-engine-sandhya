@@ -19,6 +19,8 @@ import { buildRows, duplicatesWithinFile, emailDomain, type ContactField, type I
 import { externalSourceStatus, fetchExternalContacts, type ExternalSourceStatus } from "@/lib/contacts/external";
 import type { ContactSource } from "@/lib/contacts/source";
 import type { Contact } from "@/lib/types";
+import { query } from "@/lib/db";
+import { createInquiryLead } from "@/lib/inquiries";
 
 /**
  * Contact acquisition — four ways in, one set of rules:
@@ -113,6 +115,8 @@ export interface PlannedRow extends ImportRow {
   duplicateOf?: number | null;
   /** Default include state the preview starts with. */
   include: boolean;
+  /** True when this row's company has no open opportunity, so a lead could be created from it. */
+  leadCandidate: boolean;
 }
 
 export interface ImportPlan {
@@ -126,6 +130,8 @@ export interface ImportPlan {
     duplicates: number;
     newCompanies: number;
     ownersUnmatched: number;
+    /** Companies (new or existing) with no open opportunity that a lead could be created for. */
+    leadCandidates: number;
   };
   ownerMap: Record<string, string | null>;
 }
@@ -152,13 +158,14 @@ export async function planCsvImportAction(rows: string[][], mapping: ContactFiel
     return ownerMap[label];
   };
   const companyCache = new Map<string, { id: string | null; name: string; match: "domain" | "name" | null }>();
+  const openLeadCompanies = new Set((await query<{ company_id: string }>(`select distinct company_id from leads where status not in ('won','lost')`)).map((r) => r.company_id));
 
   const planned: PlannedRow[] = [];
   let newCompanies = 0;
   const newCompanyKeys = new Set<string>();
   for (const r of built) {
     findOwner(r.owner);
-    const base: PlannedRow = { ...r, status: "invalid", company: r.company, companyId: null, companyAction: null, companyMatch: null, include: false };
+    const base: PlannedRow = { ...r, status: "invalid", company: r.company, companyId: null, companyAction: null, companyMatch: null, include: false, leadCandidate: false };
     if (r.errors.length) {
       planned.push(base);
       continue;
@@ -184,6 +191,7 @@ export async function planCsvImportAction(rows: string[][], mapping: ContactFiel
         existing: { id: match.id, name: match.name, email: match.email, company_name: match.company_name, phone: match.phone, title: match.title },
         changes,
         include: changes.length > 0,
+        leadCandidate: !openLeadCompanies.has(match.company_id),
       });
       continue;
     }
@@ -211,7 +219,7 @@ export async function planCsvImportAction(rows: string[][], mapping: ContactFiel
         newCompanies += 1;
       }
     }
-    planned.push({ ...base, status: "create", company: company.name || r.company, companyId: company.id, companyAction: company.id ? "existing" : "create", companyMatch: company.match, include: true });
+    planned.push({ ...base, status: "create", company: company.name || r.company, companyId: company.id, companyAction: company.id ? "existing" : "create", companyMatch: company.match, include: true, leadCandidate: !company.id || !openLeadCompanies.has(company.id) });
   }
 
   const summary = {
@@ -223,6 +231,7 @@ export async function planCsvImportAction(rows: string[][], mapping: ContactFiel
     duplicates: planned.filter((r) => r.status === "duplicate_in_file" || r.status === "update" || r.status === "skip").length,
     newCompanies,
     ownersUnmatched: Object.values(ownerMap).filter((v) => v === null).length,
+    leadCandidates: new Set(planned.filter((r) => r.leadCandidate && (r.status === "create" || r.status === "update" || r.status === "skip")).map((r) => r.companyId ?? `new:${(r.company ?? emailDomain(r.email) ?? "").toLowerCase()}`)).size,
   };
   return { rows: planned, summary, ownerMap };
 }
@@ -232,12 +241,13 @@ export interface ImportResult extends ActionResult {
   updated: number;
   companiesCreated: number;
   skipped: number;
+  leadsCreated: number;
 }
 
 /** Write the rows the user kept. Companies that need creating are created once per domain/name. */
-export async function commitCsvImportAction(rows: PlannedRow[], source: ContactSource, leadId?: string | null): Promise<ImportResult> {
+export async function commitCsvImportAction(rows: PlannedRow[], source: ContactSource, leadId?: string | null, options?: { createLeads?: boolean }): Promise<ImportResult> {
   const user = await getCurrentUser();
-  if (!user) return { ok: false, detail: "Sign in first.", created: 0, updated: 0, companiesCreated: 0, skipped: 0 };
+  if (!user) return { ok: false, detail: "Sign in first.", created: 0, updated: 0, companiesCreated: 0, skipped: 0, leadsCreated: 0 };
   const kept = rows.filter((r) => r.include && (r.status === "create" || r.status === "update"));
   const skipped = rows.length - kept.length;
   const companyIds = new Map<string, string>();
@@ -273,11 +283,45 @@ export async function commitCsvImportAction(rows: PlannedRow[], source: ContactS
         metadata: { kind: "contacts_imported", source, created: result.created, updated: result.updated, contact_ids: result.ids },
       });
     }
+    // Leads from the sheet: one New Lead per company that has no open
+    // opportunity, through the same path as Talk to Sales (company and contact
+    // are matched, not duplicated; owner routed; AI brief in the background).
+    let leadsCreated = 0;
+    if (options?.createLeads && !leadId) {
+      const openNow = new Set((await query<{ company_id: string }>(`select distinct company_id from leads where status not in ('won','lost')`)).map((r) => r.company_id));
+      const seen = new Set<string>();
+      for (const r of kept) {
+        if (!r.leadCandidate) continue;
+        const key = r.companyId ?? `new:${(r.company ?? emailDomain(r.email) ?? "").toLowerCase()}`;
+        if (seen.has(key)) continue;
+        seen.add(key);
+        if (r.companyId && openNow.has(r.companyId)) continue;
+        try {
+          const { lead } = await createInquiryLead(
+            { companyName: r.company ?? emailDomain(r.email) ?? "Unknown company", contactName: r.name, workEmail: r.email, phone: r.phone ?? "", numberOfUsers: r.users ?? 1, interest: r.interest ?? undefined, requirements: r.requirements ?? undefined, additionalInfo: undefined, industry: undefined, heardFrom: undefined },
+            `${source === "external_crm" ? "External CRM" : "CSV"} import`
+          );
+          openNow.add(lead.company_id);
+          leadsCreated += 1;
+        } catch (err) {
+          console.error("Lead from import failed (row continues):", err);
+        }
+      }
+    }
     revalidate(leadId);
-    return { ok: true, detail: `${result.created} added, ${result.updated} updated${companiesCreated ? `, ${companiesCreated} new compan${companiesCreated === 1 ? "y" : "ies"}` : ""}.`, created: result.created, updated: result.updated, companiesCreated, skipped };
+    if (leadsCreated) revalidatePath("/");
+    return {
+      ok: true,
+      detail: `${result.created} added, ${result.updated} updated${companiesCreated ? `, ${companiesCreated} new compan${companiesCreated === 1 ? "y" : "ies"}` : ""}${leadsCreated ? `, ${leadsCreated} new lead${leadsCreated === 1 ? "" : "s"}` : ""}.`,
+      created: result.created,
+      updated: result.updated,
+      companiesCreated,
+      skipped,
+      leadsCreated,
+    };
   } catch (err) {
     console.error("Contact import failed:", err);
-    return { ok: false, detail: "The import could not be written; nothing was changed.", created: 0, updated: 0, companiesCreated, skipped };
+    return { ok: false, detail: "The import could not be written; nothing was changed.", created: 0, updated: 0, companiesCreated, skipped, leadsCreated: 0 };
   }
 }
 
